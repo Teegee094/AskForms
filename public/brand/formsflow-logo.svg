@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="64" viewBox="0 0 260 44" fill="none">
+  <title>AskForms Primary Logo</title>
+  <g id="askforms-mark" transform="translate(4, 5) scale(0.14)">
+    <rect id="bar-1" x="0" y="0" width="252" height="32" rx="16" fill="#14383E"/>
+    <rect id="bar-2" x="0" y="56" width="252" height="32" rx="16" fill="#14383E"/>
+    <path id="bar-3" d="M16 112H236A16 16 0 0 1 236 144H229.1L204.8 124.8A27 27 0 0 0 161.1 144H16A16 16 0 0 1 16 112Z" fill="#14383E"/>
+    <rect id="bar-4" x="0" y="168" width="154" height="32" rx="16" fill="#14383E"/>
+    <path id="chevron" d="M188 146L236 184L188 222" stroke="#14383E" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text id="askforms-wordmark" x="52" y="32" fill="#14383E" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="30" font-weight="800" letter-spacing="-0.035em">AskForms</text>
+</svg>

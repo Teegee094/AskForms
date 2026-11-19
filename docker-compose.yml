@@ -1,0 +1,20 @@
+services:
+  formflow:
+    build: .
+    container_name: formflow
+    ports:
+      - "${PORT:-3840}:3840"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3840
+      - DATA_DIR=/data
+      - SEED_DEMO=${SEED_DEMO:-false}
+    volumes:
+      - formflow_data:/data
+    restart: unless-stopped
+
+volumes:
+  formflow_data:

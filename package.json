@@ -1,0 +1,18 @@
+{
+  "name": "askforms",
+  "version": "1.0.0",
+  "description": "AskForms (askforms.app) — Commercial pop-out website enquiry engine & single-domain form backend.",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node --no-warnings server/index.js",
+    "dev": "node --no-warnings --watch server/index.js",
+    "reset-db": "node --no-warnings server/reset.js",
+    "init-client": "node --no-warnings server/init-client.js",
+    "issue-license": "node --no-warnings scripts/issue-license.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "license": "UNLICENSED"
+}

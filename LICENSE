@@ -1,0 +1,24 @@
+FormFlow — Commercial Self-Hosted License
+
+Copyright (c) 2026 FormFlow. All rights reserved.
+
+GRANT OF LICENSE
+Upon payment of the one-time license fee, the Licensee (the purchasing business
+or organisation) is granted a perpetual, non-exclusive, worldwide license to:
+
+1. Install, self-host, and run FormFlow alongside the Licensee's own websites
+   and internal infrastructure (Docker, VPS, Node.js, or Cloudflare Pages).
+2. Modify the source code, styling, email templates, and webhook handlers for
+   the Licensee's own internal and customer-facing websites.
+3. White-label the dashboard, confirmation pages, and notification emails with
+   the Licensee's own branding.
+
+RESTRICTIONS
+The Licensee may NOT:
+1. Resell, redistribute, sublicense, or publish FormFlow (or substantial
+   portions of its source code) as a standalone product, template, or SaaS
+   offering to third parties.
+
+DATA OWNERSHIP & WARRANTY
+All form submissions, files, and database backups remain 100% the property of
+the Licensee. The software is provided "as is", without warranty of any kind.

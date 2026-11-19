@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 320 320" fill="none">
+  <title>AskForms</title>
+  <!-- High-visibility Mint Turquoise squircle badge that pops on both dark & light browser tabs -->
+  <rect width="320" height="320" rx="76" fill="#4FD1C5"/>
+  <g transform="translate(36, 46)">
+    <rect id="bar-1" x="0" y="0" width="252" height="32" rx="16" fill="#14383E"/>
+    <rect id="bar-2" x="0" y="56" width="252" height="32" rx="16" fill="#14383E"/>
+    <path id="bar-3" d="M16 112H236A16 16 0 0 1 236 144H229.1L204.8 124.8A27 27 0 0 0 161.1 144H16A16 16 0 0 1 16 112Z" fill="#14383E"/>
+    <rect id="bar-4" x="0" y="168" width="154" height="32" rx="16" fill="#14383E"/>
+    <path id="chevron" d="M188 146L236 184L188 222" stroke="#14383E" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
