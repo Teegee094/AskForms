@@ -1596,3 +1596,44 @@ table.data-table tbody tr.clickable:hover { background: var(--bg-hover); }
   table.data-table th, table.data-table td { padding: 14px 14px; }
   .col-hide-sm { display: none; }
 }
+
+
+/* Notification Channel Toggle Switch */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.switch-slider {
+  position: absolute;
+  inset: 0;
+  background: #cbd5e1;
+  border-radius: 999px;
+  transition: background 0.18s ease;
+}
+.switch-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.switch input:checked + .switch-slider {
+  background: var(--accent, #14383e);
+}
+.switch input:checked + .switch-slider::before {
+  transform: translateX(20px);
+}

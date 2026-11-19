@@ -2,6 +2,7 @@ import { renderManagePortalPage, renderManifestJson } from '../server/manage-pag
 import { renderClientDemoPage, renderEmbedPage, renderThanksPage } from '../server/pages.js';
 import { renderCommercialSitePage } from '../server/site-page.js';
 import { getShowcaseTemplate } from '../server/templates.js';
+import { dispatchAllEnabledChannels, dispatchSingleChannel, NOTIFICATION_CHANNEL_DEFS, parseChannelsConfig } from '../server/channels.js';
 
 const DEFAULT_FIELDS = [
   { name: 'name', label: 'Full name', type: 'text', placeholder: 'Alex Mercer', required: true, half: true },
@@ -362,6 +363,22 @@ export async function onRequest(context) {
       { step: 'sqlite', status: 'passed', detail: `Stored as ${subId}` },
     ];
 
+    if (!isSpam) {
+      const chRow = await db.prepare("SELECT value FROM app_settings WHERE key = 'notification_channels_json'").first();
+      const chResults = await dispatchAllEnabledChannels(chRow?.value, {
+        formName: form.name,
+        senderName: String(fields.name || ''),
+        senderEmail: String(raw._replyto || fields.email || ''),
+        fields,
+        submissionId: subId,
+        portalUrl: `${baseUrl}/manage`,
+      });
+      if (chResults.length > 0) {
+        const okCh = chResults.filter((c) => c.ok).length;
+        trace.push({ step: 'channels', status: okCh === chResults.length ? 'passed' : 'warning', detail: `${okCh}/${chResults.length} notification channel(s) sent` });
+      }
+    }
+
     const accept = request.headers.get('Accept') || '';
     if (accept.includes('application/json') || ct.includes('application/json')) {
       return jsonResp(200, { ok: true, submissionId: subId, spam: isSpam, next: raw._next || form.redirect_url || '/thanks', trace }, corsHeaders(origin));
@@ -448,19 +465,41 @@ export async function onRequest(context) {
       return jsonResp(400, { error: 'STRIPE_API_KEY is not configured.' });
     }
     const priceAud = Number(env.LICENSE_PRICE_AUD || 149);
+    const partnerSetupAud = Number(env.PARTNER_SETUP_PRICE_AUD || 99);
+    const includePartnerSetup = Boolean(body.includePartnerSetup);
+    const isSetupOnly = body.plan === 'partner-setup-only';
+
     const params = new URLSearchParams({
       mode: 'payment',
       'managed_payments[enabled]': 'false',
       success_url: `${baseUrl}/?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/?domain=${encodeURIComponent(cleanDomain)}`,
-      'line_items[0][price_data][currency]': 'aud',
-      'line_items[0][price_data][unit_amount]': String(Math.round(priceAud * 100)),
-      'line_items[0][price_data][product_data][name]': `AskForms — Single-Domain Lifetime License (${cleanDomain})`,
-      'line_items[0][price_data][product_data][description]': `Lifetime single-website license locked to ${cleanDomain} (${holder})`,
-      'line_items[0][quantity]': '1',
       'metadata[domain]': cleanDomain,
       'metadata[holder]': holder,
+      'metadata[include_partner_setup]': includePartnerSetup || isSetupOnly ? 'true' : 'false',
+      'metadata[plan]': isSetupOnly ? 'partner-setup-only' : includePartnerSetup ? 'license-and-setup' : 'license',
     });
+
+    if (isSetupOnly) {
+      params.set('line_items[0][price_data][currency]', 'aud');
+      params.set('line_items[0][price_data][unit_amount]', String(Math.round(partnerSetupAud * 100)));
+      params.set('line_items[0][price_data][product_data][name]', `AskForms Partner Setup & Cloudflare Hosting (${cleanDomain})`);
+      params.set('line_items[0][price_data][product_data][description]', `Done-for-you Cloudflare hosting, form setup, and website connection for ${cleanDomain}`);
+      params.set('line_items[0][quantity]', '1');
+    } else {
+      params.set('line_items[0][price_data][currency]', 'aud');
+      params.set('line_items[0][price_data][unit_amount]', String(Math.round(priceAud * 100)));
+      params.set('line_items[0][price_data][product_data][name]', `AskForms Lifetime Website License (${cleanDomain})`);
+      params.set('line_items[0][price_data][product_data][description]', `Single-website lifetime license locked to ${cleanDomain} (${holder})`);
+      params.set('line_items[0][quantity]', '1');
+      if (includePartnerSetup) {
+        params.set('line_items[1][price_data][currency]', 'aud');
+        params.set('line_items[1][price_data][unit_amount]', String(Math.round(partnerSetupAud * 100)));
+        params.set('line_items[1][price_data][product_data][name]', `Partner Setup & Cloudflare Hosting (${cleanDomain})`);
+        params.set('line_items[1][price_data][product_data][description]', `Done-for-you Cloudflare deployment, custom form build, and website button connection`);
+        params.set('line_items[1][quantity]', '1');
+      }
+    }
 
     const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
@@ -499,6 +538,8 @@ export async function onRequest(context) {
     }
     const cleanDomain = normalizeDomain(session.metadata?.domain || '');
     const holder = String(session.metadata?.holder || cleanDomain).trim();
+    const includePartnerSetup = session.metadata?.include_partner_setup === 'true';
+    const customerEmail = session.customer_details?.email || '';
     const payload = {
       id: `lic_${crypto.randomUUID().slice(0, 10)}`,
       domain: cleanDomain,
@@ -510,10 +551,33 @@ export async function onRequest(context) {
     await setSetting(db, 'license_key', key);
     await setSetting(db, 'license_holder', payload.holder);
     await setSetting(db, 'website_url', `https://${payload.domain}`);
+
+    const resendRow = await db.prepare("SELECT value FROM app_settings WHERE key = 'resend_api_key'").first();
+    const resendKey = env.RESEND_API_KEY || resendRow?.value || '';
+    let emailSent = false;
+    if (resendKey && customerEmail) {
+      try {
+        const mailRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: env.MAIL_FROM || 'AskForms <onboarding@resend.dev>',
+            to: [customerEmail],
+            subject: `Your AskForms License Key & Setup Kit (${cleanDomain})`,
+            html: `<div style="font-family:Inter,sans-serif;max-width:580px;margin:0 auto;padding:24px;color:#12262a;"><h2 style="color:#14383e;">Welcome to AskForms!</h2><p>Your lifetime website license for <strong>${cleanDomain}</strong> is ready.</p><pre style="background:#0c262b;color:#4fd1c5;padding:14px;border-radius:10px;word-break:break-all;white-space:pre-wrap;">${key}</pre>${includePartnerSetup ? '<p><strong>Partner Setup Included:</strong> Our partner team will reach out to deploy and host your AskForms workspace on Cloudflare.</p>' : '<p><strong>Self-Deploy Quick Start:</strong> Pull the AskForms repo, run <code>npm install &amp;&amp; npm run deploy:cf</code>, and paste your license key inside <code>/app</code>.</p>'}</div>`,
+          }),
+        });
+        emailSent = mailRes.ok;
+      } catch {}
+    }
+
     return jsonResp(200, {
       paid: true,
       key,
       payload,
+      includePartnerSetup,
+      customerEmail,
+      emailSent,
       workspace: await getWorkspace(db),
     });
   }
@@ -521,6 +585,34 @@ export async function onRequest(context) {
   // Gate all remaining /api/* admin routes behind authentication
   if (pathname.startsWith('/api/') && !isEdgeAuthed) {
     return jsonResp(401, { error: 'Authentication required.', authRequired: true });
+  }
+
+  if (pathname === '/api/channels' && method === 'GET') {
+    const chRow = await db.prepare("SELECT value FROM app_settings WHERE key = 'notification_channels_json'").first();
+    return jsonResp(200, {
+      definitions: NOTIFICATION_CHANNEL_DEFS,
+      config: parseChannelsConfig(chRow?.value),
+    });
+  }
+
+  if (pathname === '/api/channels' && method === 'PUT') {
+    const body = await request.json().catch(() => ({}));
+    const nextCfg = body.config && typeof body.config === 'object' ? body.config : {};
+    await setSetting(db, 'notification_channels_json', JSON.stringify(nextCfg));
+    return jsonResp(200, { saved: true, config: nextCfg });
+  }
+
+  if (pathname === '/api/channels/test' && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    const result = await dispatchSingleChannel(body.channelId, body.cfg || {}, {
+      formName: 'AskForms Test Alert',
+      senderName: 'AskForms Verification',
+      senderEmail: 'test@askforms.app',
+      fields: { message: 'This is a live test notification from your AskForms dashboard.' },
+      submissionId: 'test_' + Date.now(),
+      portalUrl: `${baseUrl}/manage`,
+    });
+    return jsonResp(result.ok ? 200 : 400, result);
   }
 
   if (pathname === '/api/bootstrap' && method === 'GET') {

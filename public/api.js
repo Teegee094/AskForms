@@ -54,6 +54,9 @@ export const api = {
   deleteWebhook: (whId) => request(`/api/webhooks/${encodeURIComponent(whId)}`, { method: 'DELETE' }),
   listMailLogs: (formId = '') => request(`/api/mail-logs${formId ? `?formId=${encodeURIComponent(formId)}` : ''}`),
   listWebhookLogs: (formId = '') => request(`/api/webhook-logs${formId ? `?formId=${encodeURIComponent(formId)}` : ''}`),
+  getChannels: () => request('/api/channels'),
+  saveChannels: (config) => request('/api/channels', { method: 'PUT', body: JSON.stringify({ config }) }),
+  testChannel: (channelId, cfg) => request('/api/channels/test', { method: 'POST', body: JSON.stringify({ channelId, cfg }) }),
 };
 
 export function escapeHtml(value) {

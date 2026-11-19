@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
-import { db, getWorkspaceConfig } from './db.js';
+import { db, getSetting, getWorkspaceConfig } from './db.js';
+import { dispatchAllEnabledChannels } from './channels.js';
 import { parseMultipart } from './multipart.js';
 import { dispatchSubmissionEmails, interpolateTemplate } from './mailer.js';
 import { getShowcaseTemplate } from './templates.js';
@@ -330,6 +331,19 @@ export async function handleIngestPost(req, res, formId, baseUrl) {
     if (webhookResults.length > 0) {
       const okCount = webhookResults.filter((w) => w.success).length;
       trace.push({ step: 'webhooks', status: okCount === webhookResults.length ? 'passed' : 'warning', detail: `${okCount}/${webhookResults.length} webhook(s) delivered` });
+    }
+
+    const channelResults = await dispatchAllEnabledChannels(getSetting('notification_channels_json'), {
+      formName: form.name,
+      senderName: cleanFields.name || '',
+      senderEmail: directives.replyTo || cleanFields.email || '',
+      fields: cleanFields,
+      submissionId,
+      portalUrl: `${baseUrl}/manage`,
+    });
+    if (channelResults.length > 0) {
+      const okCh = channelResults.filter((c) => c.ok).length;
+      trace.push({ step: 'channels', status: okCh === channelResults.length ? 'passed' : 'warning', detail: `${okCh}/${channelResults.length} push channel(s) delivered` });
     }
   }
 

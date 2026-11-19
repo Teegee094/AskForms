@@ -81,6 +81,8 @@ const state = {
   sandboxMode: 'json', // 'json' | 'urlencoded' | 'multipart'
   sandboxSimulateBot: false,
   sandboxResult: null,
+  channelsDefs: [],
+  channelsConfig: {},
 };
 
 const els = {
@@ -244,6 +246,10 @@ async function switchView(view) {
   } else if (view === 'webhooks') {
     const res = await api.listWebhookLogs();
     state.webhookLogs = res.logs;
+  } else if (view === 'channels') {
+    const res = await api.getChannels();
+    state.channelsDefs = res.definitions || [];
+    state.channelsConfig = res.config || {};
   }
 
   render();
@@ -267,6 +273,7 @@ function renderTopbar() {
     <div class="header-right">
       <nav class="header-nav" aria-label="Primary">
         <button class="header-nav-link ${state.view === 'forms' || state.view === 'form' ? 'active' : ''}" data-nav="forms">Forms</button>
+        <button class="header-nav-link ${state.view === 'channels' ? 'active' : ''}" data-nav="channels">Notifications</button>
         <button class="header-nav-link ${state.view === 'sandbox' ? 'active' : ''}" data-nav="sandbox">Sandbox</button>
         <button class="header-nav-link ${state.view === 'mail' || state.view === 'webhooks' ? 'active' : ''}" data-nav="mail">Activity</button>
         <button class="header-nav-link ${state.view === 'workspace' || state.view === 'setup' ? 'active' : ''}" data-nav="workspace">Brand</button>
@@ -2810,6 +2817,84 @@ function launchLivePopoutPreview(formId, mode = 'drawer') {
   document.body.appendChild(script);
 }
 
+function renderChannelsView() {
+  const defs = state.channelsDefs || [];
+  const cfg = state.channelsConfig || {};
+  const enabledCount = Object.values(cfg).filter((c) => c && c.enabled).length;
+
+  const cardsHtml = defs
+    .map((ch) => {
+      const chCfg = cfg[ch.id] || {};
+      const isOn = Boolean(chCfg.enabled);
+      const fieldsHtml = (ch.fields || [])
+        .map(
+          (f) => `
+            <div class="field-group" style="margin-bottom:10px;">
+              <label class="field-label">${escapeHtml(f.label)}</label>
+              <input
+                class="input"
+                type="${escapeHtml(f.type || 'text')}"
+                data-ch-field="${escapeHtml(ch.id)}"
+                data-field-key="${escapeHtml(f.key)}"
+                placeholder="${escapeHtml(f.placeholder || '')}"
+                value="${escapeHtml(chCfg[f.key] || '')}"
+              />
+            </div>
+          `
+        )
+        .join('');
+
+      return `
+        <article class="card card-padded" style="display:flex;flex-direction:column;justify-content:space-between;gap:14px;">
+          <div>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">
+              <div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <strong style="font-size:15.5px;color:var(--text-primary);">${escapeHtml(ch.name)}</strong>
+                  <span class="tag tag-accent" style="font-size:11px;">${escapeHtml(ch.cost)}</span>
+                </div>
+                <div style="font-size:12.5px;color:var(--text-secondary);margin-top:4px;">${escapeHtml(ch.description)}</div>
+              </div>
+              <label class="switch" title="Toggle ${escapeHtml(ch.name)}">
+                <input type="checkbox" data-ch-toggle="${escapeHtml(ch.id)}" ${isOn ? 'checked' : ''} />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+
+            <div class="${isOn ? '' : 'hidden'}" data-ch-body="${escapeHtml(ch.id)}" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-subtle);">
+              ${fieldsHtml}
+              <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+                <button type="button" class="btn btn-secondary btn-sm" data-action="test-channel" data-channel-id="${escapeHtml(ch.id)}">Send Test Alert</button>
+                <button type="button" class="btn btn-primary btn-sm" data-action="save-channels">Save</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      `;
+    })
+    .join('');
+
+  els.content.innerHTML = `
+    <div class="sub-header-bar">
+      <div class="sub-header-inner">
+        <div class="sub-header-left">
+          <h1 class="page-title" style="margin:0;">Push Notifications &amp; Webhooks</h1>
+          <span class="tag tag-accent">${enabledCount} Active</span>
+        </div>
+        <div class="sub-header-actions">
+          <button type="button" class="btn btn-primary btn-sm" data-action="save-channels">Save All Channels</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-container view-animate">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(360px, 1fr));gap:18px;">
+        ${cardsHtml}
+      </div>
+    </div>
+  `;
+}
+
 function renderLoginScreen(errorMessage = '') {
   const ws = state.workspace || {};
   els.brandLockup?.classList.add('hidden');
@@ -2878,6 +2963,7 @@ function render() {
 
   if (state.view === 'forms') renderFormsOverview();
   else if (state.view === 'form') renderFormWorkspace();
+  else if (state.view === 'channels') renderChannelsView();
   else if (state.view === 'sandbox') renderSandboxView();
   else if (state.view === 'mail') renderMailOutboxView();
   else if (state.view === 'webhooks') renderWebhookLogsView();
@@ -2924,6 +3010,36 @@ document.addEventListener('click', async (e) => {
     const wrap = document.querySelector('.project-heading-wrap');
     wrap?.classList.remove('open');
     wrap?.querySelector('.heading-switcher')?.setAttribute('aria-expanded', 'false');
+  }
+
+  const saveChannelsBtn = target.closest('[data-action="save-channels"]');
+  if (saveChannelsBtn) {
+    try {
+      await api.saveChannels(state.channelsConfig);
+      showToast('Notification channels saved');
+    } catch (err) {
+      showToast(err.message);
+    }
+    return;
+  }
+
+  const testChannelBtn = target.closest('[data-action="test-channel"]');
+  if (testChannelBtn) {
+    const chId = testChannelBtn.dataset.channelId;
+    const orig = testChannelBtn.textContent;
+    testChannelBtn.disabled = true;
+    testChannelBtn.textContent = 'Sending...';
+    try {
+      await api.saveChannels(state.channelsConfig);
+      await api.testChannel(chId, state.channelsConfig[chId] || {});
+      showToast('Test alert delivered!');
+    } catch (err) {
+      showToast(err.message || 'Test alert failed');
+    } finally {
+      testChannelBtn.disabled = false;
+      testChannelBtn.textContent = orig;
+    }
+    return;
   }
 
   const toggleProjMenuBtn = target.closest('[data-action="toggle-project-menu"]');
@@ -3684,6 +3800,21 @@ document.addEventListener('change', async (e) => {
     render();
     return;
   }
+  if (e.target.matches('[data-ch-toggle]')) {
+    const chId = e.target.getAttribute('data-ch-toggle');
+    if (!state.channelsConfig[chId]) state.channelsConfig[chId] = {};
+    state.channelsConfig[chId].enabled = e.target.checked;
+    api.saveChannels(state.channelsConfig).catch(() => {});
+    render();
+    return;
+  }
+  if (e.target.matches('[data-ch-field]')) {
+    const chId = e.target.getAttribute('data-ch-field');
+    const key = e.target.getAttribute('data-field-key');
+    if (!state.channelsConfig[chId]) state.channelsConfig[chId] = { enabled: true };
+    state.channelsConfig[chId][key] = e.target.value;
+    return;
+  }
   if (e.target.id === 'header-client-switcher') {
     state.clientFilter = e.target.value;
     if (state.view === 'form') {
@@ -3975,6 +4106,16 @@ document.addEventListener('submit', async (e) => {
     await refreshBootstrap();
     render();
     showToast(body.spam ? 'Bot intercepted by _gotcha honeypot' : 'Submission captured and dispatched');
+  }
+});
+
+// Live input sync for Notification Channel fields
+document.addEventListener('input', (e) => {
+  if (e.target.matches('[data-ch-field]')) {
+    const chId = e.target.getAttribute('data-ch-field');
+    const key = e.target.getAttribute('data-field-key');
+    if (!state.channelsConfig[chId]) state.channelsConfig[chId] = { enabled: true };
+    state.channelsConfig[chId][key] = e.target.value;
   }
 });
 

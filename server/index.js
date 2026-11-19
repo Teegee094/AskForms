@@ -28,12 +28,14 @@ import {
   deleteSetting,
   getFormWithCounts,
   getGlobalStats,
+  getSetting,
   getWorkspaceConfig,
   listFormsWithCounts,
   parseFormFields,
   setSetting,
   UPLOADS_DIR,
 } from './db.js';
+import { dispatchSingleChannel, NOTIFICATION_CHANNEL_DEFS, parseChannelsConfig } from './channels.js';
 import { handleIngestOptions, handleIngestPost } from './ingest.js';
 import { renderManagePortalPage, renderManifestJson } from './manage-page.js';
 import { issueLicenseKey, normalizeDomain, verifyLicenseKey } from './license.js';
@@ -379,19 +381,41 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 400, { error: 'STRIPE_API_KEY is not configured on this server.' });
       }
       const priceAud = Number(process.env.LICENSE_PRICE_AUD || 149);
+      const partnerSetupAud = Number(process.env.PARTNER_SETUP_PRICE_AUD || 99);
+      const includePartnerSetup = Boolean(body.includePartnerSetup);
+      const isSetupOnly = body.plan === 'partner-setup-only';
+
       const params = new URLSearchParams({
         mode: 'payment',
         'managed_payments[enabled]': 'false',
         success_url: `${BASE_URL}/?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${BASE_URL}/?domain=${encodeURIComponent(cleanDomain)}`,
-        'line_items[0][price_data][currency]': 'aud',
-        'line_items[0][price_data][unit_amount]': String(Math.round(priceAud * 100)),
-        'line_items[0][price_data][product_data][name]': `AskForms — Single-Domain Lifetime License (${cleanDomain})`,
-        'line_items[0][price_data][product_data][description]': `Lifetime single-website license locked to ${cleanDomain} (${holder})`,
-        'line_items[0][quantity]': '1',
         'metadata[domain]': cleanDomain,
         'metadata[holder]': holder,
+        'metadata[include_partner_setup]': includePartnerSetup || isSetupOnly ? 'true' : 'false',
+        'metadata[plan]': isSetupOnly ? 'partner-setup-only' : includePartnerSetup ? 'license-and-setup' : 'license',
       });
+
+      if (isSetupOnly) {
+        params.set('line_items[0][price_data][currency]', 'aud');
+        params.set('line_items[0][price_data][unit_amount]', String(Math.round(partnerSetupAud * 100)));
+        params.set('line_items[0][price_data][product_data][name]', `AskForms Partner Setup & Cloudflare Hosting (${cleanDomain})`);
+        params.set('line_items[0][price_data][product_data][description]', `Done-for-you Cloudflare hosting, form setup, and website connection for ${cleanDomain}`);
+        params.set('line_items[0][quantity]', '1');
+      } else {
+        params.set('line_items[0][price_data][currency]', 'aud');
+        params.set('line_items[0][price_data][unit_amount]', String(Math.round(priceAud * 100)));
+        params.set('line_items[0][price_data][product_data][name]', `AskForms Lifetime Website License (${cleanDomain})`);
+        params.set('line_items[0][price_data][product_data][description]', `Single-website lifetime license locked to ${cleanDomain} (${holder})`);
+        params.set('line_items[0][quantity]', '1');
+        if (includePartnerSetup) {
+          params.set('line_items[1][price_data][currency]', 'aud');
+          params.set('line_items[1][price_data][unit_amount]', String(Math.round(partnerSetupAud * 100)));
+          params.set('line_items[1][price_data][product_data][name]', `Partner Setup & Cloudflare Hosting (${cleanDomain})`);
+          params.set('line_items[1][price_data][product_data][description]', `Done-for-you Cloudflare deployment, custom form build, and website button connection`);
+          params.set('line_items[1][quantity]', '1');
+        }
+      }
 
       const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
         method: 'POST',
@@ -430,14 +454,39 @@ const server = http.createServer(async (req, res) => {
       }
       const cleanDomain = normalizeDomain(session.metadata?.domain || '');
       const holder = String(session.metadata?.holder || cleanDomain).trim();
+      const includePartnerSetup = session.metadata?.include_partner_setup === 'true';
+      const customerEmail = session.customer_details?.email || '';
       const { key, payload } = issueLicenseKey({ domain: cleanDomain, holder });
       setSetting('license_key', key);
       setSetting('license_holder', payload.holder);
       setSetting('website_url', `https://${payload.domain}`);
+
+      // Optionally email onboarding kit via Resend if configured
+      const resendKey = process.env.RESEND_API_KEY || getSetting('resend_api_key') || '';
+      let emailSent = false;
+      if (resendKey && customerEmail) {
+        try {
+          const mailRes = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              from: process.env.MAIL_FROM || 'AskForms <onboarding@resend.dev>',
+              to: [customerEmail],
+              subject: `Your AskForms License Key & Setup Kit (${cleanDomain})`,
+              html: `<div style="font-family:Inter,sans-serif;max-width:580px;margin:0 auto;padding:24px;color:#12262a;"><h2 style="color:#14383e;">Welcome to AskForms!</h2><p>Your lifetime website license for <strong>${cleanDomain}</strong> is ready.</p><pre style="background:#0c262b;color:#4fd1c5;padding:14px;border-radius:10px;word-break:break-all;white-space:pre-wrap;">${key}</pre>${includePartnerSetup ? '<p><strong>Partner Setup Included:</strong> Our partner team has been notified and will reach out to deploy and host your AskForms workspace on Cloudflare.</p>' : '<p><strong>Self-Deploy Quick Start:</strong> Pull the AskForms repo, run <code>npm install &amp;&amp; npm run deploy:cf</code>, and paste your license key inside <code>/app</code>.</p>'}</div>`,
+            }),
+          });
+          emailSent = mailRes.ok;
+        } catch {}
+      }
+
       return sendJson(res, 200, {
         paid: true,
         key,
         payload,
+        includePartnerSetup,
+        customerEmail,
+        emailSent,
         workspace: getWorkspaceConfig(),
       });
     }
@@ -450,6 +499,32 @@ const server = http.createServer(async (req, res) => {
     // ---------------------------------------------------------
     // 5. DASHBOARD REST API
     // ---------------------------------------------------------
+    if (pathname === '/api/channels' && method === 'GET') {
+      return sendJson(res, 200, {
+        definitions: NOTIFICATION_CHANNEL_DEFS,
+        config: parseChannelsConfig(getSetting('notification_channels_json')),
+      });
+    }
+
+    if (pathname === '/api/channels' && method === 'PUT') {
+      const body = await readJsonBody(req);
+      const nextCfg = body.config && typeof body.config === 'object' ? body.config : {};
+      setSetting('notification_channels_json', JSON.stringify(nextCfg));
+      return sendJson(res, 200, { saved: true, config: nextCfg });
+    }
+
+    if (pathname === '/api/channels/test' && method === 'POST') {
+      const body = await readJsonBody(req);
+      const result = await dispatchSingleChannel(body.channelId, body.cfg || {}, {
+        formName: 'AskForms Test Alert',
+        senderName: 'AskForms Verification',
+        senderEmail: 'test@askforms.app',
+        fields: { message: 'This is a live test notification from your AskForms dashboard.' },
+        submissionId: 'test_' + Date.now(),
+        portalUrl: `${BASE_URL}/manage`,
+      });
+      return sendJson(res, result.ok ? 200 : 400, result);
+    }
     if (pathname === '/api/bootstrap' && method === 'GET') {
       return sendJson(res, 200, {
         baseUrl: BASE_URL,

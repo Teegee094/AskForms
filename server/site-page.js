@@ -115,6 +115,77 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       70% { box-shadow: 0 0 0 18px rgba(79, 209, 197, 0); }
       100% { box-shadow: 0 0 0 0 rgba(79, 209, 197, 0); }
     }
+    @keyframes marqueeScroll {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+    .marquee-section {
+      padding: 18px 0 36px;
+      overflow: hidden;
+    }
+    .marquee-label {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .marquee-viewport {
+      position: relative;
+      overflow: hidden;
+      mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+      -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+    }
+    .marquee-track {
+      display: flex;
+      gap: 12px;
+      width: max-content;
+      animation: marqueeScroll 34s linear infinite;
+    }
+    .marquee-viewport:hover .marquee-track {
+      animation-play-state: paused;
+    }
+    .marquee-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      height: 42px;
+      padding: 0 16px;
+      border-radius: var(--radius-pill);
+      background: var(--canvas);
+      border: 1px solid var(--border);
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--petrol);
+      white-space: nowrap;
+    }
+    .marquee-pill-tag {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+      background: var(--white);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .partner-addon-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(79, 209, 197, 0.12);
+      border: 1px solid rgba(79, 209, 197, 0.3);
+      margin: 10px 0 12px;
+      cursor: pointer;
+    }
+    .partner-addon-row input {
+      margin-top: 3px;
+      accent-color: var(--mint);
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+    }
     .reveal {
       opacity: 0;
       transform: translateY(18px);
@@ -1272,6 +1343,41 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       </div>
     </section>
 
+    <!-- 3B. ROTATING ZERO-COST NOTIFICATION CHANNELS MARQUEE -->
+    <section class="marquee-section" aria-label="Built-in free notification channels">
+      <div class="container">
+        <div class="marquee-label">Receive instant enquiry alerts on the go with built-in zero-cost integrations</div>
+      </div>
+      <div class="marquee-viewport">
+        <div class="marquee-track">
+          <span class="marquee-pill">Email <span class="marquee-pill-tag">Free</span></span>
+          <span class="marquee-pill">ntfy Mobile Push <span class="marquee-pill-tag">Open Source</span></span>
+          <span class="marquee-pill">Telegram <span class="marquee-pill-tag">Unlimited</span></span>
+          <span class="marquee-pill">Discord <span class="marquee-pill-tag">Unlimited</span></span>
+          <span class="marquee-pill">Slack <span class="marquee-pill-tag">Free</span></span>
+          <span class="marquee-pill">WhatsApp <span class="marquee-pill-tag">Direct Push</span></span>
+          <span class="marquee-pill">Microsoft Teams <span class="marquee-pill-tag">Free</span></span>
+          <span class="marquee-pill">Google Chat <span class="marquee-pill-tag">Free</span></span>
+          <span class="marquee-pill">LINE <span class="marquee-pill-tag">Messaging</span></span>
+          <span class="marquee-pill">WeChat Work <span class="marquee-pill-tag">Group Alerts</span></span>
+          <span class="marquee-pill">Gotify Push <span class="marquee-pill-tag">Open Source</span></span>
+          <span class="marquee-pill">Custom Webhooks <span class="marquee-pill-tag">Any CRM</span></span>
+          <span class="marquee-pill">Email <span class="marquee-pill-tag">Free</span></span>
+          <span class="marquee-pill">ntfy Mobile Push <span class="marquee-pill-tag">Open Source</span></span>
+          <span class="marquee-pill">Telegram <span class="marquee-pill-tag">Unlimited</span></span>
+          <span class="marquee-pill">Discord <span class="marquee-pill-tag">Unlimited</span></span>
+          <span class="marquee-pill">Slack <span class="marquee-pill-tag">Free</span></span>
+          <span class="marquee-pill">WhatsApp <span class="marquee-pill-tag">Direct Push</span></span>
+          <span class="marquee-pill">Microsoft Teams <span class="marquee-pill-tag">Free</span></span>
+          <span class="marquee-pill">Google Chat <span class="marquee-pill-tag">Free</span></span>
+          <span class="marquee-pill">LINE <span class="marquee-pill-tag">Messaging</span></span>
+          <span class="marquee-pill">WeChat Work <span class="marquee-pill-tag">Group Alerts</span></span>
+          <span class="marquee-pill">Gotify Push <span class="marquee-pill-tag">Open Source</span></span>
+          <span class="marquee-pill">Custom Webhooks <span class="marquee-pill-tag">Any CRM</span></span>
+        </div>
+      </div>
+    </section>
+
     <!-- 4. FULLY CUSTOMISABLE + HOW BUSINESSES USE ASKFORMS -->
     <section class="section-block" id="examples">
       <div class="container">
@@ -1459,7 +1565,14 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
                     <label class="checkout-label" for="lic-holder">Business or Client Name</label>
                     <input class="checkout-input" id="lic-holder" name="holder" placeholder="Harbour Plumbing Co" required />
                   </div>
-                  <button type="submit" class="btn-hero-primary" style="width:100%;height:44px;margin-top:6px;" id="stripe-buy-btn">
+                  <label class="partner-addon-row" for="include-partner-setup">
+                    <input type="checkbox" id="include-partner-setup" name="includePartnerSetup" />
+                    <span style="font-size:12.5px;line-height:1.4;color:rgba(240,253,250,0.92);">
+                      <strong>Add Partner Setup &amp; Hosting (+$99 AUD)</strong><br />
+                      <span style="color:rgba(230,255,250,0.72);">We deploy, host, and connect AskForms to your site for you.</span>
+                    </span>
+                  </label>
+                  <button type="submit" class="btn-hero-primary" style="width:100%;height:44px;" id="stripe-buy-btn">
                     Buy License · $${escapeHtml(priceAud)} AUD
                   </button>
                 </form>
@@ -1468,32 +1581,39 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
                   <div style="font-weight:700;color:var(--petrol);">Payment Verified. Your License Key is Ready:</div>
                   <div style="margin-top:2px;color:var(--ink-secondary);font-size:12px;">Active for <span class="mono" id="res-domain"></span></div>
                   <pre class="key-pre" id="res-key"></pre>
-                  <button type="button" class="btn-tpl-primary" style="width:100%;height:36px;font-size:12.5px;" id="copy-key-btn">Copy Key</button>
+                  <div id="res-next-steps" style="margin:10px 0;font-size:12.5px;color:var(--ink-secondary);line-height:1.5;"></div>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button type="button" class="btn-tpl-primary" style="flex:1;height:36px;font-size:12.5px;" id="copy-key-btn">Copy Key</button>
+                    <button type="button" class="btn-tpl-secondary" style="height:36px;font-size:12.5px;" id="download-guide-btn">Setup Guide</button>
+                  </div>
+                  <button type="button" class="btn-tpl-secondary" style="width:100%;height:34px;font-size:12px;margin-top:8px;display:none;" id="addon-partner-btn">
+                    Prefer us to set it up? Add Partner Setup ($99)
+                  </button>
                 </div>
               </div>
             </div>
           </article>
 
-          <!-- Tier 3: Web Designers & Agencies -->
+          <!-- Tier 3: Done-For-You Partner Setup & Hosting -->
           <article class="offer-card reveal" style="transition-delay:160ms;">
             <div>
-              <span class="offer-pill">For Web Agencies</span>
-              <h3 class="offer-title">Client Website Rollouts</h3>
+              <span class="offer-pill">Done-For-You Option</span>
+              <h3 class="offer-title">Partner Setup &amp; Hosting</h3>
               <div class="offer-price-row">
-                <span class="offer-price" style="font-size:34px;">Per Site</span>
-                <span class="offer-price-note">1 license per client domain</span>
+                <span class="offer-price">+$99</span>
+                <span class="offer-price-note">AUD once-off setup fee</span>
               </div>
               <p style="font-size:14px;color:var(--ink-secondary);margin:0 0 18px;">
-                Build custom pop-out forms into client websites and hand them a clean mobile Owner Portal without a monthly bill.
+                Want everything handled for you? Our partner team sets up your forms, hosts your workspace, and connects your website buttons.
               </p>
               <ul class="offer-features">
-                <li><span>✓</span><span>Demo live on client staging sites for free</span></li>
-                <li><span>✓</span><span>Purchase a single-domain key on launch day</span></li>
-                <li><span>✓</span><span>Give clients their own 6-digit PIN Owner Portal</span></li>
+                <li><span>✓</span><span>Zero technical setup or code required</span></li>
+                <li><span>✓</span><span>Managed hosting included with zero monthly fees</span></li>
+                <li><span>✓</span><span>Custom forms, Owner Portal PIN, and mobile alerts configured</span></li>
               </ul>
             </div>
-            <button type="button" class="btn-tpl-secondary" style="width:100%;height:44px;" data-scroll-checkout="client">
-              License a Client Site
+            <button type="button" class="btn-tpl-secondary" style="width:100%;height:44px;" data-scroll-checkout="partner">
+              Add Partner Setup
             </button>
           </article>
         </div>
@@ -1583,10 +1703,10 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
         const card = document.getElementById('checkout-card');
         const box = document.getElementById('checkout-box-inner');
         const domainInput = document.getElementById('lic-domain');
-        const holderInput = document.getElementById('lic-holder');
-        if (mode === 'client' && domainInput && holderInput) {
-          domainInput.placeholder = 'clientwebsite.com.au';
-          holderInput.placeholder = 'Client Business Name';
+        const partnerCb = document.getElementById('include-partner-setup');
+        if (mode === 'partner' && partnerCb) {
+          partnerCb.checked = true;
+          partnerCb.dispatchEvent(new Event('change'));
         }
         card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         if (box) {
@@ -2001,13 +2121,28 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
 
     renderOwnerPortal();
 
-    // 4. Live Stripe Checkout & Post-Purchase License Verification
+    // 4. Live Stripe Checkout & Post-Purchase Onboarding Kit
     const form = document.getElementById('issue-key-form');
     const stripeBtn = document.getElementById('stripe-buy-btn');
+    const partnerCb = document.getElementById('include-partner-setup');
     const resBox = document.getElementById('issued-result');
     const resDomain = document.getElementById('res-domain');
     const resKey = document.getElementById('res-key');
+    const resNextSteps = document.getElementById('res-next-steps');
+    const addonPartnerBtn = document.getElementById('addon-partner-btn');
     let latestKey = '';
+    let latestDomain = '';
+    let latestHolder = '';
+
+    function syncCheckoutButtonLabel() {
+      if (!stripeBtn) return;
+      const base = Number(${JSON.stringify(Number(priceAud) || 149)});
+      const total = partnerCb?.checked ? base + 99 : base;
+      stripeBtn.textContent = partnerCb?.checked
+        ? 'Buy License + Setup · $' + total + ' AUD'
+        : 'Buy License · $' + base + ' AUD';
+    }
+    partnerCb?.addEventListener('change', syncCheckoutButtonLabel);
 
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -2022,6 +2157,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
           body: JSON.stringify({
             domain: fd.get('domain'),
             holder: fd.get('holder'),
+            includePartnerSetup: Boolean(partnerCb?.checked),
           }),
         });
         const data = await res.json();
@@ -2032,7 +2168,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       } catch (err) {
         alert(err.message);
         stripeBtn.disabled = false;
-        stripeBtn.textContent = 'Buy License · $${escapeHtml(priceAud)} AUD';
+        syncCheckoutButtonLabel();
       }
     });
 
@@ -2044,8 +2180,16 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
         .then((data) => {
           if (data.key && data.payload) {
             latestKey = data.key;
+            latestDomain = data.payload.domain;
+            latestHolder = data.payload.holder;
             resDomain.textContent = data.payload.domain;
             resKey.textContent = data.key;
+            if (data.includePartnerSetup) {
+              resNextSteps.innerHTML = '<strong>Partner Setup Included:</strong> Our partner team will deploy and host your forms and contact you at <strong>' + esc(data.customerEmail || 'your checkout email') + '</strong>.';
+            } else {
+              resNextSteps.innerHTML = '<strong>Quick Self-Deploy:</strong> Download your setup guide below for the 3-step Git pull and launch instructions, or add Partner Setup anytime.';
+              if (addonPartnerBtn) addonPartnerBtn.style.display = 'block';
+            }
             resBox.classList.add('visible');
             document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
           }
@@ -2057,6 +2201,60 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       if (latestKey) {
         navigator.clipboard.writeText(latestKey);
         document.getElementById('copy-key-btn').textContent = 'Copied!';
+      }
+    });
+
+    document.getElementById('download-guide-btn')?.addEventListener('click', () => {
+      const guideText = [
+        'AskForms Lifetime Website License & Quick Setup Guide',
+        '=====================================================',
+        'Licensed Domain: ' + latestDomain,
+        'License Holder:  ' + latestHolder,
+        'License Key:     ' + latestKey,
+        '',
+        'STEP 1: Pull AskForms & Install',
+        '  git clone https://github.com/Teegee094/AskForms.git',
+        '  cd AskForms',
+        '  npm install',
+        '',
+        'STEP 2: Launch Your Workspace (Cloudflare Pages or Node 22)',
+        '  npx wrangler d1 create askforms',
+        '  npx wrangler d1 execute askforms --remote --file=./cloudflare/migrations/0001_init.sql',
+        '  npx wrangler pages deploy public --project-name=askforms',
+        '',
+        'STEP 3: Activate Your Domain Key',
+        '  Open https://your-host/app and paste your ASK1 license key above.',
+        '  Then toggle on Email, ntfy, Telegram, Discord, Slack, or WhatsApp alerts under Notifications.',
+        '',
+        'Need our partner to handle hosting & setup for $99 AUD? Visit https://askforms.app/#pricing',
+      ].join('\\n');
+      const blob = new Blob([guideText], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'askforms-setup-' + (latestDomain || 'license') + '.txt';
+      a.click();
+    });
+
+    addonPartnerBtn?.addEventListener('click', async () => {
+      addonPartnerBtn.disabled = true;
+      addonPartnerBtn.textContent = 'Opening Stripe...';
+      try {
+        const res = await fetch('/api/license/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            domain: latestDomain,
+            holder: latestHolder,
+            plan: 'partner-setup-only',
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.checkoutUrl) throw new Error(data.error || 'Unable to start checkout');
+        window.location.href = data.checkoutUrl;
+      } catch (err) {
+        alert(err.message);
+        addonPartnerBtn.disabled = false;
+        addonPartnerBtn.textContent = 'Prefer us to set it up? Add Partner Setup ($99)';
       }
     });
   </script>
