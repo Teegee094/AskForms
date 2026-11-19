@@ -1311,9 +1311,14 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
     .site-footer {
       background: var(--canvas);
       border-top: 1px solid var(--border);
-      padding: 40px 0;
+      padding: 40px 0 56px;
       font-size: 13.5px;
       color: var(--muted);
+    }
+    body.footer-visible .af-launcher {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transform: translateY(14px) !important;
     }
     .footer-inner {
       display: flex;
@@ -1934,7 +1939,19 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       if (e.key === 'Escape') closeConnectorModal();
     });
 
-    // 0B. Scroll-Reveal Observer
+    // 0B. Hide floating widget launcher whenever footer enters viewport so it never covers footer links
+    const siteFooter = document.querySelector('.site-footer');
+    if (siteFooter && 'IntersectionObserver' in window) {
+      const footerIo = new IntersectionObserver(
+        (entries) => {
+          document.body.classList.toggle('footer-visible', Boolean(entries[0]?.isIntersecting));
+        },
+        { threshold: 0.05 }
+      );
+      footerIo.observe(siteFooter);
+    }
+
+    // 0C. Scroll-Reveal Observer
     const revealEls = document.querySelectorAll('.reveal');
     if ('IntersectionObserver' in window) {
       const io = new IntersectionObserver(
