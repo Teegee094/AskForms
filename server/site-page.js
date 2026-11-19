@@ -131,102 +131,80 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       animation: checkoutPulse 1.1s var(--ease-out);
     }
 
-    /* 1. PRODUCT-STYLE FLUSH TOP HEADER (MATCHING ASKFORMS APP & OWNER PORTAL) */
+    /* 1. DETACHED PILL NAVBAR (SCROLLS OFF SCREEN NATURALLY) */
     .site-header {
-      position: sticky;
-      top: 0;
+      position: relative;
       z-index: 40;
-      height: 76px;
-      background: var(--white);
-      border-bottom: 1px solid var(--border-soft);
+      padding: 18px 0 10px;
     }
     .nav-container {
       max-width: var(--container-max);
-      height: 100%;
       margin: 0 auto;
       padding: 0 clamp(18px, 3.5vw, 44px);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 20px;
+      gap: 16px;
+    }
+    .nav-left-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 28px;
+      background: var(--canvas);
+      border: 1px solid var(--border);
+      padding: 8px 24px 8px 16px;
+      border-radius: var(--radius-pill);
+      box-shadow: 0 8px 24px -10px rgba(18, 38, 42, 0.08);
     }
     .brand-logo {
       display: inline-flex;
       align-items: center;
-      gap: 11px;
-      font-size: 20px;
+      gap: 10px;
+      font-size: 19px;
       font-weight: 700;
       letter-spacing: -0.03em;
       color: var(--petrol);
     }
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      height: 100%;
-    }
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 4px;
-      height: 100%;
+      gap: 22px;
       list-style: none;
       margin: 0;
       padding: 0;
     }
     .nav-link {
-      position: relative;
-      height: 76px;
-      padding: 0 14px;
-      display: inline-flex;
-      align-items: center;
       font-size: 14px;
-      font-weight: 600;
-      color: var(--muted);
+      font-weight: 500;
+      color: var(--ink-secondary);
       transition: color 0.15s ease;
     }
     .nav-link:hover { color: var(--petrol); }
-    .nav-link::after {
-      content: '';
-      position: absolute;
-      left: 14px;
-      right: 14px;
-      bottom: 0;
-      height: 2.5px;
-      border-radius: 2px 2px 0 0;
-      background: var(--mint);
-      transform: scaleX(0);
-      transition: transform 0.18s var(--ease-out);
-    }
-    .nav-link:hover::after {
-      transform: scaleX(1);
-    }
     .nav-right-cluster {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      margin-left: 6px;
+      gap: 10px;
     }
     .nav-secondary-pill {
       display: inline-flex;
       align-items: center;
-      height: 38px;
-      padding: 0 16px;
+      height: 42px;
+      padding: 0 18px;
       border-radius: var(--radius-pill);
-      background: var(--white);
+      background: var(--canvas);
       border: 1px solid var(--border);
       font-size: 13.5px;
-      font-weight: 600;
+      font-weight: 500;
       color: var(--petrol);
       cursor: pointer;
-      transition: background 0.16s ease;
+      transition: background 0.16s ease, transform 0.16s var(--ease-out);
     }
-    .nav-secondary-pill:hover { background: var(--canvas); }
+    .nav-secondary-pill:hover { background: var(--surface-soft); transform: translateY(-1px); }
     .nav-primary-pill {
       display: inline-flex;
       align-items: center;
-      height: 38px;
-      padding: 0 18px;
+      height: 42px;
+      padding: 0 20px;
       border-radius: var(--radius-pill);
       background: var(--petrol);
       color: var(--white);
@@ -234,13 +212,13 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       font-size: 13.5px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.16s ease;
+      transition: background 0.16s ease, transform 0.16s var(--ease-out);
     }
-    .nav-primary-pill:hover { background: var(--petrol-mid); }
+    .nav-primary-pill:hover { background: var(--petrol-mid); transform: translateY(-1px); }
 
     /* 3. HERO FRAME */
     .hero-section {
-      padding: 28px 0 40px;
+      padding: 12px 0 40px;
     }
     .hero-frame {
       position: relative;
@@ -1188,21 +1166,20 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
 </head>
 <body>
 
-  <!-- 1. PRODUCT-STYLE FLUSH WHITE TOP HEADER -->
+  <!-- 1. DETACHED PILL NAVBAR (SCROLLS OFF SCREEN) -->
   <header class="site-header">
     <nav class="nav-container" aria-label="Primary Navigation">
-      <a href="#top" class="brand-logo">
-        <svg width="28" height="26" viewBox="0 0 256 240" fill="none" aria-hidden="true">
-          <rect x="0" y="0" width="252" height="32" rx="16" fill="currentColor"/>
-          <rect x="0" y="56" width="252" height="32" rx="16" fill="currentColor"/>
-          <path d="M16 112H236A16 16 0 0 1 236 144H229.1L204.8 124.8A27 27 0 0 0 161.1 144H16A16 16 0 0 1 16 112Z" fill="currentColor"/>
-          <rect x="0" y="168" width="154" height="32" rx="16" fill="currentColor"/>
-          <path d="M188 146L236 184L188 222" stroke="currentColor" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span>AskForms</span>
-      </a>
-
-      <div class="header-right">
+      <div class="nav-left-pill">
+        <a href="#top" class="brand-logo">
+          <svg width="26" height="24" viewBox="0 0 256 240" fill="none" aria-hidden="true">
+            <rect x="0" y="0" width="252" height="32" rx="16" fill="currentColor"/>
+            <rect x="0" y="56" width="252" height="32" rx="16" fill="currentColor"/>
+            <path d="M16 112H236A16 16 0 0 1 236 144H229.1L204.8 124.8A27 27 0 0 0 161.1 144H16A16 16 0 0 1 16 112Z" fill="currentColor"/>
+            <rect x="0" y="168" width="154" height="32" rx="16" fill="currentColor"/>
+            <path d="M188 146L236 184L188 222" stroke="currentColor" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>AskForms</span>
+        </a>
         <ul class="nav-links">
           <li><a href="#examples" class="nav-link">How It’s Used</a></li>
           <li><a href="#owner-portal" class="nav-link">Owner Portal</a></li>
@@ -1210,15 +1187,15 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
           <li><a href="#pricing" class="nav-link">Pricing</a></li>
           <li><a href="#faq" class="nav-link">FAQ</a></li>
         </ul>
+      </div>
 
-        <div class="nav-right-cluster">
-          <button type="button" class="nav-secondary-pill" data-launch-template="template-quote" data-launch-mode="drawer" data-launch-title="Fast Quote Request">
-            Try Live Form
-          </button>
-          <button type="button" class="nav-primary-pill" data-scroll-checkout>
-            Buy License
-          </button>
-        </div>
+      <div class="nav-right-cluster">
+        <button type="button" class="nav-secondary-pill" data-launch-template="template-quote" data-launch-mode="drawer" data-launch-title="Fast Quote Request">
+          Try Live Form
+        </button>
+        <button type="button" class="nav-primary-pill" data-scroll-checkout>
+          Buy License
+        </button>
       </div>
     </nav>
   </header>
