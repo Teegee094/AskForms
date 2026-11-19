@@ -1889,7 +1889,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
         <a href="#how-it-works">How It Works</a>
         <a href="#pricing">Pricing</a>
         <a href="#support" data-launch-template="template-support" data-launch-mode="drawer" data-launch-title="Help &amp; License Support">Help &amp; Support</a>
-        <a href="/app">Partner Studio</a>
+        <a href="/partner">Partner Login</a>
       </div>
     </div>
   </footer>

@@ -258,7 +258,7 @@ export async function onRequest(context) {
     return htmlResp(200, renderCommercialSitePage(await getWorkspace(db), first?.id || 'audit-intake', baseUrl));
   }
 
-  if ((pathname === '/app' || pathname === '/setup') && method === 'GET') {
+  if ((pathname === '/app' || pathname === '/partner' || pathname === '/setup') && method === 'GET') {
     return env.ASSETS.fetch(new URL('/app.html', request.url));
   }
 
@@ -387,16 +387,53 @@ export async function onRequest(context) {
     return Response.redirect(`${baseUrl}${raw._next || form.redirect_url || `/thanks?form=${formId}`}`, 303);
   }
 
-  // REST API Routes (/api/*)
+  // REST API Routes (/api/*) — Session-Scoped Per-Account Cookie (askforms_auth_v2)
   const cookieHeader = request.headers.get('Cookie') || '';
-  const isEdgeAuthed = /(?:^|;\s*)formflow_session=authenticated_v1(?:;|$)/.test(cookieHeader);
+  const sessionMatch = cookieHeader.match(/(?:^|;\s*)askforms_auth_v2=([^;]+)/);
+  let edgeSession = null;
+  if (sessionMatch) {
+    try {
+      const parsed = parseB64UrlJson(decodeURIComponent(sessionMatch[1]));
+      if (parsed && parsed.role && parsed.domain) edgeSession = parsed;
+    } catch {}
+  }
+  const isEdgeAuthed = Boolean(edgeSession);
+
+  async function getScopedWorkspace() {
+    const base = await getWorkspace(db);
+    if (!edgeSession) {
+      return { ...base, brand_name: 'AskForms', logo_url: '', auth_enabled: true };
+    }
+    if (edgeSession.role === 'client') {
+      return {
+        ...base,
+        brand_name: edgeSession.holder || 'AskForms',
+        license_holder: edgeSession.holder || '',
+        website_url: `https://${edgeSession.domain}`,
+        auth_enabled: true,
+        session_role: 'client',
+        license: {
+          ...base.license,
+          isLicensed: true,
+          licensedDomain: edgeSession.domain,
+          holder: edgeSession.holder,
+        },
+      };
+    }
+    return {
+      ...base,
+      brand_name: 'AskForms',
+      auth_enabled: true,
+      session_role: 'partner',
+    };
+  }
 
   if (pathname === '/api/auth/status' && method === 'GET') {
-    const ws = await getWorkspace(db);
     return jsonResp(200, {
       authEnabled: true,
       authenticated: isEdgeAuthed,
-      workspace: { ...ws, auth_enabled: true },
+      session: edgeSession,
+      workspace: await getScopedWorkspace(),
     });
   }
 
@@ -405,23 +442,38 @@ export async function onRequest(context) {
     const candidate = String(body.password || '').trim();
     const reqDomain = normalizeDomain(body.domain || '');
     const adminPass = String(env.ADMIN_PASSWORD || 'askforms2026').trim();
-    const verifiedKey = candidate.startsWith('ASK1.') ? parseKeyPayload(candidate) : null;
 
-    if (verifiedKey) {
-      if (reqDomain && reqDomain !== normalizeDomain(verifiedKey.domain)) {
+    let nextSession = null;
+    if (candidate.startsWith('ASK1.')) {
+      const verifiedKey = parseKeyPayload(candidate);
+      if (!verifiedKey) {
+        return jsonResp(401, { error: 'Invalid license key.' });
+      }
+      if (!reqDomain) {
+        return jsonResp(400, { error: 'Enter your website domain.' });
+      }
+      if (reqDomain !== normalizeDomain(verifiedKey.domain)) {
         return jsonResp(401, { error: 'Domain does not match this license key.' });
       }
-      await setSetting(db, 'license_key', candidate);
-      await setSetting(db, 'brand_name', verifiedKey.holder);
-      await setSetting(db, 'license_holder', verifiedKey.holder);
-      await setSetting(db, 'website_url', `https://${verifiedKey.domain}`);
+      nextSession = {
+        role: 'client',
+        domain: verifiedKey.domain,
+        holder: verifiedKey.holder,
+      };
+    } else if (candidate && candidate === adminPass) {
+      nextSession = {
+        role: 'partner',
+        domain: reqDomain || 'askforms.app',
+        holder: 'AskForms',
+      };
     }
 
-    if (verifiedKey || (candidate && candidate === adminPass)) {
+    if (nextSession) {
+      const encoded = toB64Url(JSON.stringify(nextSession));
       return jsonResp(
         200,
-        { ok: true },
-        { 'Set-Cookie': 'formflow_session=authenticated_v1; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800' }
+        { ok: true, session: nextSession },
+        { 'Set-Cookie': `askforms_auth_v2=${encodeURIComponent(encoded)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800` }
       );
     }
     return jsonResp(401, { error: 'Invalid domain or license key.' });
@@ -431,7 +483,7 @@ export async function onRequest(context) {
     return jsonResp(
       200,
       { ok: true },
-      { 'Set-Cookie': 'formflow_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' }
+      { 'Set-Cookie': 'askforms_auth_v2=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' }
     );
   }
 
@@ -702,16 +754,26 @@ export async function onRequest(context) {
   }
 
   if (pathname === '/api/bootstrap' && method === 'GET') {
+    let forms = await listFormsWithCounts(db);
+    if (edgeSession?.role === 'client' && edgeSession.holder) {
+      const targetHolder = edgeSession.holder.toLowerCase();
+      const targetDomain = normalizeDomain(edgeSession.domain);
+      forms = forms.filter(
+        (f) =>
+          String(f.client_name || '').toLowerCase() === targetHolder ||
+          String(f.allowed_origins || '').toLowerCase().includes(targetDomain)
+      );
+    }
     return jsonResp(200, {
       baseUrl,
       stats: await getStats(db),
-      forms: await listFormsWithCounts(db),
-      workspace: await getWorkspace(db),
+      forms,
+      workspace: await getScopedWorkspace(),
     });
   }
 
   if (pathname === '/api/workspace' && method === 'GET') {
-    return jsonResp(200, { workspace: await getWorkspace(db) });
+    return jsonResp(200, { workspace: await getScopedWorkspace() });
   }
 
   if (pathname === '/api/workspace' && method === 'PATCH') {

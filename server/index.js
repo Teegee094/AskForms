@@ -1137,10 +1137,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---------------------------------------------------------
-    // 6. STATIC FRONTEND FILES (SPA at /app and /setup)
+    // 6. STATIC FRONTEND FILES (SPA at /app, /partner, and /setup)
     // ---------------------------------------------------------
     if (method === 'GET') {
-      const safePath = path.normalize(pathname === '/app' || pathname === '/setup' ? '/app.html' : pathname).replace(/^(\.\.[/\\])+/, '');
+      const safePath = path.normalize(pathname === '/app' || pathname === '/partner' || pathname === '/setup' ? '/app.html' : pathname).replace(/^(\.\.[/\\])+/, '');
       const candidate = path.join(PUBLIC_DIR, safePath);
       if (candidate.startsWith(PUBLIC_DIR) && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
         return serveFile(res, candidate);
