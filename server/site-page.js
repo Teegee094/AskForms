@@ -131,109 +131,102 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       animation: checkoutPulse 1.1s var(--ease-out);
     }
 
-    /* 1. TOP ANNOUNCEMENT BAR */
-    .announcement-bar {
-      background: var(--petrol-deep);
-      color: rgba(255, 255, 255, 0.9);
-      font-size: 13px;
-      padding: 10px 16px;
-      text-align: center;
-    }
-    .announcement-inner {
-      max-width: var(--container-max);
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .announcement-inner strong { color: var(--mint); font-weight: 600; }
-    .announcement-link {
-      color: var(--white);
-      font-weight: 600;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
-
-    /* 2. STICKY DETACHED PILL NAVBAR */
+    /* 1. PRODUCT-STYLE FLUSH TOP HEADER (MATCHING ASKFORMS APP & OWNER PORTAL) */
     .site-header {
       position: sticky;
-      top: 12px;
+      top: 0;
       z-index: 40;
-      padding: 12px 0;
+      height: 76px;
+      background: var(--white);
+      border-bottom: 1px solid var(--border-soft);
     }
     .nav-container {
       max-width: var(--container-max);
+      height: 100%;
       margin: 0 auto;
       padding: 0 clamp(18px, 3.5vw, 44px);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
-    }
-    .nav-left-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 28px;
-      background: rgba(244, 247, 248, 0.92);
-      backdrop-filter: blur(14px);
-      border: 1px solid var(--border);
-      padding: 8px 24px 8px 16px;
-      border-radius: var(--radius-pill);
-      box-shadow: 0 8px 24px -8px rgba(18, 38, 42, 0.08);
+      gap: 20px;
     }
     .brand-logo {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      font-size: 19px;
+      gap: 11px;
+      font-size: 20px;
       font-weight: 700;
       letter-spacing: -0.03em;
       color: var(--petrol);
     }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      height: 100%;
+    }
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 22px;
+      gap: 4px;
+      height: 100%;
       list-style: none;
       margin: 0;
       padding: 0;
     }
     .nav-link {
+      position: relative;
+      height: 76px;
+      padding: 0 14px;
+      display: inline-flex;
+      align-items: center;
       font-size: 14px;
-      font-weight: 500;
-      color: var(--ink-secondary);
+      font-weight: 600;
+      color: var(--muted);
       transition: color 0.15s ease;
     }
     .nav-link:hover { color: var(--petrol); }
-
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 0;
+      height: 2.5px;
+      border-radius: 2px 2px 0 0;
+      background: var(--mint);
+      transform: scaleX(0);
+      transition: transform 0.18s var(--ease-out);
+    }
+    .nav-link:hover::after {
+      transform: scaleX(1);
+    }
     .nav-right-cluster {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
+      margin-left: 6px;
     }
     .nav-secondary-pill {
       display: inline-flex;
       align-items: center;
-      height: 42px;
-      padding: 0 18px;
+      height: 38px;
+      padding: 0 16px;
       border-radius: var(--radius-pill);
-      background: rgba(244, 247, 248, 0.92);
-      backdrop-filter: blur(14px);
+      background: var(--white);
       border: 1px solid var(--border);
       font-size: 13.5px;
-      font-weight: 500;
+      font-weight: 600;
       color: var(--petrol);
       cursor: pointer;
-      transition: background 0.18s ease, transform 0.18s var(--ease-out);
+      transition: background 0.16s ease;
     }
-    .nav-secondary-pill:hover { background: var(--surface-soft); transform: translateY(-1px); }
+    .nav-secondary-pill:hover { background: var(--canvas); }
     .nav-primary-pill {
       display: inline-flex;
       align-items: center;
-      height: 42px;
-      padding: 0 20px;
+      height: 38px;
+      padding: 0 18px;
       border-radius: var(--radius-pill);
       background: var(--petrol);
       color: var(--white);
@@ -241,13 +234,13 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       font-size: 13.5px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.18s ease, transform 0.18s var(--ease-out);
+      transition: background 0.16s ease;
     }
-    .nav-primary-pill:hover { background: var(--petrol-mid); transform: translateY(-1px); }
+    .nav-primary-pill:hover { background: var(--petrol-mid); }
 
     /* 3. HERO FRAME */
     .hero-section {
-      padding: 8px 0 40px;
+      padding: 28px 0 40px;
     }
     .hero-frame {
       position: relative;
@@ -397,6 +390,10 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       border-radius: 20px;
       padding: 22px;
       box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.3);
+      height: 344px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
     .showcase-eyebrow {
       font-size: 11.5px;
@@ -416,12 +413,14 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
     .showcase-copy {
       font-size: 13.5px;
       color: var(--ink-secondary);
-      margin: 0 0 14px;
+      margin: 0 0 12px;
+      height: 42px;
+      overflow: hidden;
     }
     .showcase-field-preview {
       display: grid;
       gap: 7px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .showcase-fake-input {
       display: flex;
@@ -666,8 +665,9 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       color: var(--petrol);
     }
     .op-split {
-      flex: 1;
-      min-height: 0;
+      height: 552px;
+      min-height: 552px;
+      max-height: 552px;
       display: grid;
       grid-template-columns: 350px minmax(0, 1fr);
     }
@@ -779,18 +779,20 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
     }
 
     .op-detail-pane {
-      overflow-y: auto;
-      padding: 26px 30px;
+      height: 552px;
+      overflow: hidden;
+      padding: 24px 28px;
       min-width: 0;
       background-color: #eaf1f4;
       background-image:
         radial-gradient(ellipse 640px 360px at 92% 4%, rgba(79, 209, 197, 0.14), transparent 65%),
         radial-gradient(rgba(20, 56, 62, 0.08) 1px, transparent 1px);
       background-size: 100% 100%, 24px 24px;
-      scrollbar-width: none;
     }
-    .op-detail-pane::-webkit-scrollbar { display: none; }
     .op-sheet {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
       background: var(--white);
       border: 1px solid var(--border-soft);
       border-radius: 18px;
@@ -889,22 +891,31 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
     }
     .op-btn-primary:hover { background: var(--petrol-mid); }
     .op-sheet-body {
-      padding: 22px 26px;
+      flex: 1;
+      min-height: 0;
+      padding: 20px 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
     .op-msg {
-      margin: 0 0 20px;
-      font-size: 15px;
-      line-height: 1.65;
+      margin: 0 0 14px;
+      height: 46px;
+      overflow: hidden;
+      font-size: 14.5px;
+      line-height: 1.55;
       color: var(--ink);
     }
     .op-fields-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-      padding: 16px;
+      gap: 10px 14px;
+      padding: 14px 16px;
+      height: 118px;
+      align-content: center;
       background: #f4f7f8;
       border-radius: 10px;
-      margin-bottom: 18px;
+      margin-bottom: 14px;
     }
     .op-f-label {
       font-size: 11px;
@@ -1177,28 +1188,21 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
 </head>
 <body>
 
-  <!-- 1. TOP ANNOUNCEMENT BAR -->
-  <div class="announcement-bar">
-    <div class="announcement-inner">
-      <span>Stop paying monthly subscriptions for website forms. Own your enquiry system outright for <strong>$${escapeHtml(priceAud)} AUD once-off</strong>.</span>
-      <a href="#examples" class="announcement-link">See Live Examples</a>
-    </div>
-  </div>
-
-  <!-- 2. STICKY DETACHED PILL NAVBAR -->
+  <!-- 1. PRODUCT-STYLE FLUSH WHITE TOP HEADER -->
   <header class="site-header">
     <nav class="nav-container" aria-label="Primary Navigation">
-      <div class="nav-left-pill">
-        <a href="#top" class="brand-logo">
-          <svg width="26" height="24" viewBox="0 0 256 240" fill="none" aria-hidden="true">
-            <rect x="0" y="0" width="252" height="32" rx="16" fill="currentColor"/>
-            <rect x="0" y="56" width="252" height="32" rx="16" fill="currentColor"/>
-            <path d="M16 112H236A16 16 0 0 1 236 144H229.1L204.8 124.8A27 27 0 0 0 161.1 144H16A16 16 0 0 1 16 112Z" fill="currentColor"/>
-            <rect x="0" y="168" width="154" height="32" rx="16" fill="currentColor"/>
-            <path d="M188 146L236 184L188 222" stroke="currentColor" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span>AskForms</span>
-        </a>
+      <a href="#top" class="brand-logo">
+        <svg width="28" height="26" viewBox="0 0 256 240" fill="none" aria-hidden="true">
+          <rect x="0" y="0" width="252" height="32" rx="16" fill="currentColor"/>
+          <rect x="0" y="56" width="252" height="32" rx="16" fill="currentColor"/>
+          <path d="M16 112H236A16 16 0 0 1 236 144H229.1L204.8 124.8A27 27 0 0 0 161.1 144H16A16 16 0 0 1 16 112Z" fill="currentColor"/>
+          <rect x="0" y="168" width="154" height="32" rx="16" fill="currentColor"/>
+          <path d="M188 146L236 184L188 222" stroke="currentColor" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>AskForms</span>
+      </a>
+
+      <div class="header-right">
         <ul class="nav-links">
           <li><a href="#examples" class="nav-link">How It’s Used</a></li>
           <li><a href="#owner-portal" class="nav-link">Owner Portal</a></li>
@@ -1206,15 +1210,15 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
           <li><a href="#pricing" class="nav-link">Pricing</a></li>
           <li><a href="#faq" class="nav-link">FAQ</a></li>
         </ul>
-      </div>
 
-      <div class="nav-right-cluster">
-        <button type="button" class="nav-secondary-pill" data-launch-template="template-quote" data-launch-mode="drawer" data-launch-title="Fast Quote Request">
-          Try Live Form
-        </button>
-        <button type="button" class="nav-primary-pill" data-scroll-checkout>
-          Buy License
-        </button>
+        <div class="nav-right-cluster">
+          <button type="button" class="nav-secondary-pill" data-launch-template="template-quote" data-launch-mode="drawer" data-launch-title="Fast Quote Request">
+            Try Live Form
+          </button>
+          <button type="button" class="nav-primary-pill" data-scroll-checkout>
+            Buy License
+          </button>
+        </div>
       </div>
     </nav>
   </header>
@@ -1265,15 +1269,17 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
             </div>
 
             <div class="showcase-card-inner" id="hero-scene-card">
-              <div class="showcase-eyebrow" id="hs-eyebrow">Slide-Over Drawer · Trades &amp; Services</div>
-              <h2 class="showcase-heading" id="hs-title">Fast Quote Request</h2>
-              <p class="showcase-copy" id="hs-copy">
-                Slides out smoothly over your page when a visitor clicks your quote button, keeping them on your website from start to finish.
-              </p>
-              <div class="showcase-field-preview" id="hs-fields">
-                <div class="showcase-fake-input"><span>What do you need a quote for?</span><span>Emergency Repair ▾</span></div>
-                <div class="showcase-fake-input"><span>Suburb or Postcode</span><span>Surry Hills 2010</span></div>
-                <div class="showcase-fake-input"><span>Mobile Number</span><span>0412 345 678</span></div>
+              <div>
+                <div class="showcase-eyebrow" id="hs-eyebrow">Slide-Over Drawer · Trades &amp; Services</div>
+                <h2 class="showcase-heading" id="hs-title">Fast Quote Request</h2>
+                <p class="showcase-copy" id="hs-copy">
+                  Slides out smoothly over your page when a visitor clicks your quote button, keeping them on your website from start to finish.
+                </p>
+                <div class="showcase-field-preview" id="hs-fields">
+                  <div class="showcase-fake-input"><span>What do you need a quote for?</span><span>Emergency Repair ▾</span></div>
+                  <div class="showcase-fake-input"><span>Suburb or Postcode</span><span>Surry Hills 2010</span></div>
+                  <div class="showcase-fake-input"><span>Mobile Number</span><span>0412 345 678</span></div>
+                </div>
               </div>
               <div class="showcase-actions">
                 <button type="button" class="btn-tpl-primary" id="hs-launch-drawer" data-launch-template="template-quote" data-launch-mode="drawer" data-launch-title="Fast Quote Request">
@@ -1688,7 +1694,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
     });
 
     // 3. 100% Authentic Split-Pane Owner Portal Preview
-    const STORAGE_KEY = 'askforms_owner_portal_preview_v2';
+    const STORAGE_KEY = 'askforms_owner_portal_preview_v3';
     const DEFAULT_ENQUIRIES = [
       {
         id: 'enq_1042',
@@ -1745,6 +1751,25 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
           'Mobile Number': '0433 222 111',
         },
         notes: 'Sent private dining menu and deposit invoice.',
+        isUserTest: false,
+      },
+      {
+        id: 'enq_1036',
+        form_name: 'Property Inspection Enquiry',
+        sender_name: 'David Chen',
+        sender_email: 'david.chen@example.com.au',
+        phone: '0421 987 654',
+        status: 'closed',
+        time_rel: '3d',
+        time_full: '16 Nov, 11:20 am',
+        message: 'Available Thursday afternoon or Saturday morning for a private viewing.',
+        fields: {
+          'Request Type': 'Book a Private Inspection',
+          'Property Address': '42 Ocean Street, Bondi',
+          'Preferred Day': 'Thursday Afternoon',
+          'Mobile Number': '0421 987 654',
+        },
+        notes: 'Inspection completed and contract sent.',
         isUserTest: false,
       },
     ];
@@ -1844,11 +1869,12 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       const activeItem = filtered.find((i) => i.id === opState.selectedId) || null;
       const detailEl = document.getElementById('op-detail-pane');
       if (!activeItem) {
-        detailEl.innerHTML = '<div style="height:100%;display:grid;place-items:center;color:var(--muted);font-size:14px;">Select an enquiry from the left list to view details.</div>';
+        detailEl.innerHTML = '<article class="op-sheet" style="display:grid;place-items:center;color:var(--muted);font-size:14px;">Select an enquiry from the left list to view details.</article>';
         return;
       }
 
       const fieldCells = Object.entries(activeItem.fields || {})
+        .slice(0, 4)
         .map(
           ([k, v]) =>
             '<div><div class="op-f-label">' + esc(k) + '</div><div class="op-f-val">' + esc(v) + '</div></div>'
@@ -1882,8 +1908,10 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
             '<span class="mono" style="font-size:11.5px;color:var(--faint);">' + esc(activeItem.sender_email) + '</span>' +
           '</div>' +
           '<div class="op-sheet-body">' +
-            (activeItem.message ? '<p class="op-msg">' + esc(activeItem.message) + '</p>' : '') +
-            (fieldCells ? '<div class="op-fields-grid">' + fieldCells + '</div>' : '') +
+            '<div>' +
+              '<p class="op-msg">' + esc(activeItem.message || 'Submitted enquiry.') + '</p>' +
+              '<div class="op-fields-grid">' + fieldCells + '</div>' +
+            '</div>' +
             '<div class="op-notes-wrap">' +
               '<div style="display:flex;align-items:center;justify-content:space-between;">' +
                 '<span class="op-f-label" style="margin:0;">Internal Team Notes</span>' +
