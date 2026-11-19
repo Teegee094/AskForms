@@ -254,7 +254,7 @@ export const api = {
     }
     return request('/api/auth/status');
   },
-  login: (password) => request('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) }),
+  login: (password, domain = '') => request('/api/auth/login', { method: 'POST', body: JSON.stringify({ password, domain }) }),
   logout: () => (IS_DEMO_MODE ? Promise.resolve({ ok: true }) : request('/api/auth/logout', { method: 'POST' })),
   bootstrap: async () => {
     if (IS_DEMO_MODE) {

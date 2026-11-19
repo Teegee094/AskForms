@@ -251,7 +251,7 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === '/api/auth/login' && method === 'POST') {
       const body = await readJsonBody(req);
-      if (!isAuthEnabled() || verifyAdminPassword(body.password)) {
+      if (!isAuthEnabled() || verifyAdminPassword(body.password, body.domain)) {
         const token = createSessionToken();
         res.writeHead(200, {
           'Content-Type': 'application/json; charset=utf-8',
@@ -260,7 +260,7 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ ok: true }));
         return;
       }
-      return sendJson(res, 401, { error: 'Incorrect administrator password.' });
+      return sendJson(res, 401, { error: 'Invalid domain or license key.' });
     }
 
     if (pathname === '/api/auth/logout' && method === 'POST') {

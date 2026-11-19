@@ -36,20 +36,28 @@ export function isAuthEnabled() {
   return true;
 }
 
-export function verifyAdminPassword(candidate) {
+export function verifyAdminPassword(candidate, requestedDomain = '') {
   const input = String(candidate || '').trim();
   if (!input) return false;
 
-  // 1. Accept any valid cryptographically signed ASK1 single-domain license key
+  // 1. Accept any valid cryptographically signed ASK1 single-domain license key (matching domain if supplied)
   if (input.startsWith('ASK1.')) {
     const verified = verifyLicenseKey(input);
-    if (verified.valid) {
-      setSetting('license_key', input);
-      setSetting('license_holder', verified.holder);
-      setSetting('website_url', `https://${verified.domain}`);
-      return true;
+    if (!verified.valid) return false;
+    const reqDom = String(requestedDomain || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .split('/')[0];
+    if (reqDom && reqDom !== verified.domain) {
+      return false;
     }
-    return false;
+    setSetting('license_key', input);
+    setSetting('brand_name', verified.holder);
+    setSetting('license_holder', verified.holder);
+    setSetting('website_url', `https://${verified.domain}`);
+    return true;
   }
 
   // 2. Accept stored custom admin password hash

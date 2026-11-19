@@ -3066,27 +3066,24 @@ function renderLoginScreen(errorMessage = '') {
     <div class="auth-screen">
       <form id="login-form" class="auth-card">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;">
-          ${
-            ws.logo_url
-              ? `<img class="brand-logo-img" src="${escapeHtml(ws.logo_url)}" alt="${escapeHtml(ws.brand_name || 'AskForms')}" />`
-              : `<span class="brand-mark">${icons.brand}</span><span class="brand-name">${escapeHtml(ws.brand_name || 'AskForms')}</span>`
-          }
+          <span class="brand-mark">${icons.brand}</span>
+          <span class="brand-name">AskForms</span>
         </div>
-        <h1 class="page-title" style="font-size:24px;margin-bottom:8px;">Workspace Sign In</h1>
-        <p style="margin:0 0 20px;font-size:13.5px;color:var(--text-secondary);">Enter your purchased <code class="cell-mono">ASK1</code> license key or partner administrator password to unlock your workspace.</p>
+        <h1 class="page-title" style="font-size:22px;margin-bottom:20px;">Sign in</h1>
         ${
           errorMessage
             ? `<div class="card" style="padding:10px 12px;margin-bottom:16px;background:var(--danger-soft);border-color:#f0cbc8;color:var(--danger);font-size:13px;">${escapeHtml(errorMessage)}</div>`
             : ''
         }
         <div class="field-group">
-          <label class="field-label" for="login-password">License Key (ASK1...) or Admin Password</label>
-          <input class="input" id="login-password" name="password" type="password" placeholder="ASK1.eyJ... or password" required autofocus autocomplete="current-password" />
+          <label class="field-label" for="login-domain">Domain</label>
+          <input class="input mono" id="login-domain" name="domain" type="text" placeholder="yourdomain.com.au" autofocus autocomplete="username" />
         </div>
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:4px;">Unlock Workspace</button>
-        <div style="margin-top:16px;text-align:center;font-size:12.5px;color:var(--text-secondary);">
-          Need a site license? <a href="/" style="color:var(--text-primary);font-weight:700;text-decoration:underline;">Purchase on askforms.app &rarr;</a>
+        <div class="field-group">
+          <label class="field-label" for="login-password">License Key</label>
+          <input class="input mono" id="login-password" name="password" type="password" placeholder="ASK1..." required autocomplete="current-password" />
         </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:6px;">Sign In</button>
       </form>
     </div>
   `;
@@ -4132,7 +4129,7 @@ document.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
     try {
-      await api.login(fd.get('password'));
+      await api.login(fd.get('password'), fd.get('domain'));
       state.authenticated = true;
       await refreshBootstrap();
       render();

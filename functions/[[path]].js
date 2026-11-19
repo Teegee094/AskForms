@@ -403,11 +403,16 @@ export async function onRequest(context) {
   if (pathname === '/api/auth/login' && method === 'POST') {
     const body = await request.json().catch(() => ({}));
     const candidate = String(body.password || '').trim();
+    const reqDomain = normalizeDomain(body.domain || '');
     const adminPass = String(env.ADMIN_PASSWORD || 'askforms2026').trim();
     const verifiedKey = candidate.startsWith('ASK1.') ? parseKeyPayload(candidate) : null;
 
     if (verifiedKey) {
+      if (reqDomain && reqDomain !== normalizeDomain(verifiedKey.domain)) {
+        return jsonResp(401, { error: 'Domain does not match this license key.' });
+      }
       await setSetting(db, 'license_key', candidate);
+      await setSetting(db, 'brand_name', verifiedKey.holder);
       await setSetting(db, 'license_holder', verifiedKey.holder);
       await setSetting(db, 'website_url', `https://${verifiedKey.domain}`);
     }
@@ -419,7 +424,7 @@ export async function onRequest(context) {
         { 'Set-Cookie': 'formflow_session=authenticated_v1; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800' }
       );
     }
-    return jsonResp(401, { error: 'Enter a valid ASK1 license key or partner administrator password.' });
+    return jsonResp(401, { error: 'Invalid domain or license key.' });
   }
 
   if (pathname === '/api/auth/logout' && method === 'POST') {
