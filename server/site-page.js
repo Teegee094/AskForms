@@ -1032,6 +1032,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       font-weight: 600;
       letter-spacing: -0.04em;
       line-height: 1;
+      white-space: nowrap;
     }
     .offer-price-note {
       font-size: 13.5px;
