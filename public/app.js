@@ -277,13 +277,7 @@ function renderTopbar() {
   }
 
   els.topbar.innerHTML = `
-    <div class="header-left" style="display:flex;align-items:center;gap:10px;">
-      ${
-        isDemoMode()
-          ? `<span class="tag tag-accent" style="margin-left:180px;">Interactive Demo Mode · Local Browser Sandbox</span>`
-          : ''
-      }
-    </div>
+    <div class="header-left" aria-hidden="true"></div>
 
     <div class="header-right">
       <nav class="header-nav" aria-label="Primary">
@@ -296,9 +290,8 @@ function renderTopbar() {
       </nav>
       ${
         isDemoMode()
-          ? `<a class="btn btn-primary btn-sm" href="/#pricing">Buy License · $149</a>
-             <button class="btn btn-secondary btn-sm" data-action="reset-demo-studio">Reset Demo</button>`
-          : `<a class="btn btn-primary btn-sm" href="/manage" target="_blank" rel="noopener">Owner Portal</a>
+          ? `<a class="btn btn-primary btn-sm" href="/#pricing">Buy License · $149</a>`
+          : `<a class="btn btn-primary btn-sm" href="/manage" target="_blank" rel="noopener">Owner Inbox</a>
              <button class="btn btn-ghost btn-sm" style="padding:0 10px;" data-action="logout" title="Sign out">${icons.lock}</button>`
       }
     </div>
@@ -2855,6 +2848,7 @@ function launchLivePopoutPreview(formId, mode = 'drawer') {
   script.src = `/widget.js?v=${Date.now()}`;
   script.setAttribute('data-form', formId);
   script.setAttribute('data-mode', mode);
+  script.setAttribute('data-launcher', 'false');
   script.setAttribute('data-label', form?.submit_label || 'Get a Quote');
   script.setAttribute('data-title', title);
   script.setAttribute('data-accent', state.workspace?.accent_color || '#14383e');
@@ -2869,13 +2863,69 @@ function launchLivePopoutPreview(formId, mode = 'drawer') {
 function renderAssistantView() {
   const msgs = state.assistantMessages || [];
   const draft = state.assistantDraftForm;
+
+  els.content.innerHTML = `
+    <div class="sub-header-bar">
+      <div class="sub-header-inner">
+        <div class="sub-header-left">
+          <h1 class="page-title" style="margin:0;">AI Assistant</h1>
+        </div>
+        <div class="sub-header-actions">
+          <button type="button" class="btn btn-secondary btn-sm" data-action="open-ai-settings">AI &amp; MCP Settings</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-action="assistant-clear">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-container view-animate" style="max-width:780px;">
+      <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 210px);min-height:460px;overflow:hidden;">
+        <div id="assistant-chat-log" style="flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:12px;">
+          ${msgs
+            .map(
+              (m) => `
+              <div style="align-self:${m.role === 'user' ? 'flex-end' : 'flex-start'};max-width:82%;padding:12px 16px;border-radius:${m.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};font-size:14px;line-height:1.58;white-space:pre-wrap;background:${m.role === 'user' ? 'var(--accent)' : 'var(--bg-subtle)'};color:${m.role === 'user' ? '#ffffff' : 'var(--text-primary)'};">${escapeHtml(m.text)}</div>
+            `
+            )
+            .join('')}
+
+          ${
+            draft
+              ? `<div style="align-self:flex-start;width:100%;max-width:82%;padding:14px 16px;border-radius:14px;background:var(--accent-soft);border:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                  <div>
+                    <strong style="font-size:14px;color:var(--text-primary);">${escapeHtml(draft.name)}</strong>
+                    <div class="cell-secondary">${draft.fields.length} fields · ${draft.multi_step ? '2-Step Layout' : 'Single-Step Layout'}</div>
+                  </div>
+                  <button type="button" class="btn btn-primary btn-sm" data-action="assistant-create-draft">Create Form</button>
+                </div>`
+              : ''
+          }
+        </div>
+
+        <div style="padding:14px 18px;border-top:1px solid var(--border-subtle);background:var(--bg-surface);">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+            <button type="button" class="btn btn-secondary btn-sm" style="height:28px;font-size:12px;padding:0 12px;" data-assistant-prompt="Create a 2-step roofing quote form asking for suburb, roof type, solar panels, urgency, and phone">Roofing Quote Form</button>
+            <button type="button" class="btn btn-secondary btn-sm" style="height:28px;font-size:12px;padding:0 12px;" data-assistant-prompt="Create a clinic appointment booking form with preferred day, time, and NDIS number">Clinic Booking Form</button>
+            <button type="button" class="btn btn-secondary btn-sm" style="height:28px;font-size:12px;padding:0 12px;" data-assistant-prompt="Give me live form analytics">Form Analytics</button>
+            <button type="button" class="btn btn-secondary btn-sm" style="height:28px;font-size:12px;padding:0 12px;" data-assistant-prompt="Show unread enquiries in my inbox">Unread Enquiries</button>
+          </div>
+          <form id="assistant-chat-form" style="display:flex;gap:8px;">
+            <input class="input" id="assistant-input" name="message" placeholder="Ask me to build a form, search your inbox, or show analytics..." required style="flex:1;" />
+            <button type="submit" class="btn btn-primary btn-sm">Send</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function openAiSettingsModal() {
   const mcpUrl = `${state.baseUrl}/api/mcp`;
   const mcpSnippet = JSON.stringify(
     {
       mcpServers: {
         askforms: {
           url: mcpUrl,
-          headers: { Authorization: 'Bearer YOUR_ASK1_KEY_OR_ADMIN_PASSWORD' },
+          headers: { Authorization: 'Bearer YOUR_LICENSE_KEY' },
         },
       },
     },
@@ -2883,96 +2933,43 @@ function renderAssistantView() {
     2
   );
 
-  els.content.innerHTML = `
-    <div class="sub-header-bar">
-      <div class="sub-header-inner">
-        <div class="sub-header-left">
-          <h1 class="page-title" style="margin:0;">AI Form &amp; Inbox Assistant</h1>
-          <span class="tag tag-accent">Free Built-In · MCP Ready</span>
-        </div>
-        <div class="sub-header-actions">
-          <button type="button" class="btn btn-secondary btn-sm" data-action="assistant-clear">Clear Chat</button>
-        </div>
-      </div>
+  openModal(`
+    <div class="modal-header">
+      <h2 class="modal-title">AI &amp; MCP Settings</h2>
+      <button class="btn-icon" data-action="close-modal" aria-label="Close">${icons.x}</button>
     </div>
-
-    <div class="content-container view-animate">
-      <div class="split-grid" style="align-items:start;">
-        <div class="card card-padded" style="display:flex;flex-direction:column;gap:14px;">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button type="button" class="btn btn-secondary btn-sm" data-assistant-prompt="Create a 2-step roofing quote form asking for suburb, roof type, solar panels, urgency, and phone">Build a Quote Form</button>
-            <button type="button" class="btn btn-secondary btn-sm" data-assistant-prompt="Create a clinic appointment booking form with preferred day, time, and NDIS number">Build a Clinic Booking Form</button>
-            <button type="button" class="btn btn-secondary btn-sm" data-assistant-prompt="Give me live form analytics">Form Analytics</button>
-            <button type="button" class="btn btn-secondary btn-sm" data-assistant-prompt="Show unread enquiries in my inbox">Query Inbox</button>
-          </div>
-
-          <div id="assistant-chat-log" style="display:flex;flex-direction:column;gap:10px;max-height:380px;overflow-y:auto;padding:12px;border-radius:12px;background:var(--bg-subtle);border:1px solid var(--border-subtle);">
-            ${msgs
-              .map(
-                (m) => `
-                <div style="align-self:${m.role === 'user' ? 'flex-end' : 'flex-start'};max-width:88%;padding:10px 14px;border-radius:12px;font-size:13.5px;line-height:1.55;white-space:pre-wrap;background:${m.role === 'user' ? 'var(--accent)' : 'var(--bg-surface)'};color:${m.role === 'user' ? '#ffffff' : 'var(--text-primary)'};border:1px solid var(--border-subtle);">${escapeHtml(m.text)}</div>
-              `
-              )
-              .join('')}
-          </div>
-
-          ${
-            draft
-              ? `<div style="padding:14px;border-radius:12px;background:var(--accent-soft);border:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-                  <div>
-                    <strong style="font-size:14px;color:var(--text-primary);">Draft Ready: ${escapeHtml(draft.name)}</strong>
-                    <div class="cell-secondary">${draft.fields.length} fields · ${draft.multi_step ? '2-Step Layout' : 'Single-Step Layout'}</div>
-                  </div>
-                  <button type="button" class="btn btn-primary btn-sm" data-action="assistant-create-draft">Create Form Now</button>
-                </div>`
-              : ''
-          }
-
-          <form id="assistant-chat-form" style="display:flex;gap:8px;">
-            <input class="input" id="assistant-input" name="message" placeholder="Describe a form to build, query your inbox, or ask for analytics..." required style="flex:1;" />
-            <button type="submit" class="btn btn-primary btn-sm">Send</button>
-          </form>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:18px;">
+      <div>
+        <h3 style="margin:0 0 6px;font-size:14.5px;font-weight:700;">Connect Your Own AI (MCP Server)</h3>
+        <p class="cell-secondary" style="margin:0 0 10px;">Plug AskForms into Claude Desktop, ChatGPT, or Cursor using your own AI subscription.</p>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <input class="input mono" value="${escapeHtml(mcpUrl)}" readonly style="flex:1;font-size:12px;" />
+          <button type="button" class="btn btn-secondary btn-sm" data-copy="${escapeHtml(mcpUrl)}">Copy URL</button>
         </div>
-
-        <div style="display:flex;flex-direction:column;gap:16px;">
-          <div class="card card-padded">
-            <h2 class="section-title" style="margin-bottom:6px;">Connect Your Own AI (MCP Server)</h2>
-            <p class="cell-secondary" style="margin:0 0 12px;">
-              Connect Claude Desktop, ChatGPT, or Cursor directly to your AskForms MCP endpoint to create forms and summarise enquiries with your existing AI subscription ($0 extra cost).
-            </p>
-            <div class="field-group" style="margin-bottom:10px;">
-              <label class="field-label">MCP Endpoint URL</label>
-              <div style="display:flex;gap:8px;">
-                <input class="input mono" value="${escapeHtml(mcpUrl)}" readonly style="flex:1;font-size:12px;" />
-                <button type="button" class="btn btn-secondary btn-sm" data-copy="${escapeHtml(mcpUrl)}">Copy</button>
-              </div>
-            </div>
-            <pre class="mono" style="margin:0;padding:12px;border-radius:10px;background:#0c262b;color:#4fd1c5;font-size:11.5px;overflow-x:auto;">${escapeHtml(mcpSnippet)}</pre>
+        <pre class="mono" style="margin:0;padding:12px;border-radius:10px;background:#0c262b;color:#4fd1c5;font-size:11.5px;overflow-x:auto;">${escapeHtml(mcpSnippet)}</pre>
+      </div>
+      <div style="border-top:1px solid var(--border-subtle);padding-top:16px;">
+        <h3 style="margin:0 0 6px;font-size:14.5px;font-weight:700;">Optional: Bring Your Own API Key</h3>
+        <p class="cell-secondary" style="margin:0 0 10px;">Not required. Paste a Gemini (free tier) or OpenAI key only if you want full LLM responses.</p>
+        <div class="form-grid-2">
+          <div class="field-group" style="margin:0;">
+            <label class="field-label" for="byok-provider">Provider</label>
+            <select class="select" id="byok-provider">
+              <option value="gemini" ${state.assistantByok.provider === 'gemini' ? 'selected' : ''}>Google Gemini (Free)</option>
+              <option value="openai" ${state.assistantByok.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
+            </select>
           </div>
-
-          <div class="card card-padded">
-            <h2 class="section-title" style="margin-bottom:6px;">Optional: Bring Your Own AI Key (BYOK)</h2>
-            <p class="cell-secondary" style="margin:0 0 12px;">
-              Not required! The built-in assistant above works free out of the box. Paste a Gemini (free tier) or OpenAI key below only if you want full LLM phrasing.
-            </p>
-            <div class="form-grid-2">
-              <div class="field-group" style="margin:0;">
-                <label class="field-label" for="byok-provider">Provider</label>
-                <select class="select" id="byok-provider">
-                  <option value="gemini" ${state.assistantByok.provider === 'gemini' ? 'selected' : ''}>Google Gemini (Free Tier)</option>
-                  <option value="openai" ${state.assistantByok.provider === 'openai' ? 'selected' : ''}>OpenAI (GPT-4o Mini)</option>
-                </select>
-              </div>
-              <div class="field-group" style="margin:0;">
-                <label class="field-label" for="byok-key">API Key (Browser Session Only)</label>
-                <input class="input mono" id="byok-key" type="password" placeholder="AIza... or sk-..." value="${escapeHtml(state.assistantByok.apiKey || '')}" />
-              </div>
-            </div>
+          <div class="field-group" style="margin:0;">
+            <label class="field-label" for="byok-key">API Key</label>
+            <input class="input mono" id="byok-key" type="password" placeholder="AIza... or sk-..." value="${escapeHtml(state.assistantByok.apiKey || '')}" />
           </div>
         </div>
       </div>
     </div>
-  `;
+    <div class="modal-footer">
+      <button type="button" class="btn btn-primary btn-sm" data-action="save-ai-settings">Save</button>
+    </div>
+  `);
 }
 
 function renderChannelsView() {
@@ -3166,6 +3163,19 @@ document.addEventListener('click', async (e) => {
     const wrap = document.querySelector('.project-heading-wrap');
     wrap?.classList.remove('open');
     wrap?.querySelector('.heading-switcher')?.setAttribute('aria-expanded', 'false');
+  }
+
+  if (target.closest('[data-action="open-ai-settings"]')) {
+    openAiSettingsModal();
+    return;
+  }
+
+  if (target.closest('[data-action="save-ai-settings"]')) {
+    state.assistantByok.provider = document.getElementById('byok-provider')?.value || 'gemini';
+    state.assistantByok.apiKey = document.getElementById('byok-key')?.value?.trim() || '';
+    closeModal();
+    showToast('AI settings saved');
+    return;
   }
 
   if (target.closest('[data-action="reset-demo-studio"]')) {
@@ -4414,8 +4424,12 @@ async function init() {
     return;
   }
   const params = new URLSearchParams(window.location.search);
+  const requestedView = params.get('view');
   const requestedForm = params.get('form');
-  if (requestedForm && state.forms.some((f) => f.id === requestedForm)) {
+  if (requestedView === 'assistant') {
+    state.view = 'assistant';
+    render();
+  } else if (requestedForm && state.forms.some((f) => f.id === requestedForm)) {
     await openForm(requestedForm);
   } else {
     render();

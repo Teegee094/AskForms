@@ -1617,7 +1617,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
           <div class="custom-banner-pills" style="align-items:center;">
             <span class="custom-pill">Custom Questions &amp; Dropdowns</span>
             <span class="custom-pill">Photo &amp; File Uploads</span>
-            <span class="custom-pill">Built-In AI Form Builder</span>
+            <a href="/app?demo=1&amp;view=assistant" class="btn-tpl-secondary" style="height:36px;padding:0 14px;font-size:13px;display:inline-flex;align-items:center;">Try AI Assistant</a>
             <a href="/app?demo=1" class="btn-tpl-primary" style="height:36px;padding:0 16px;font-size:13px;display:inline-flex;align-items:center;">Open Demo Studio</a>
           </div>
         </div>

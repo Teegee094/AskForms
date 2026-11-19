@@ -6,7 +6,7 @@ export function isDemoMode() {
   return IS_DEMO_MODE;
 }
 
-const DEMO_STORAGE_KEY = 'askforms_studio_demo_v1';
+const DEMO_STORAGE_KEY = 'askforms_studio_demo_v2';
 
 const DEMO_CHANNEL_DEFS = [
   { id: 'email_resend', name: 'Email (Resend)', cost: 'Free (3,000/mo)', description: 'Formatted enquiry emails with 1-click Reply-To.', fields: [{ key: 'to', label: 'Recipient Email', placeholder: 'owner@yourdomain.com.au', type: 'email' }, { key: 'apiKey', label: 'Resend API Key', placeholder: 're_xxxxxxxxx', type: 'password' }] },
@@ -27,7 +27,7 @@ function createDefaultDemoStore() {
   const now = new Date().toISOString();
   return {
     workspace: {
-      brand_name: 'Harbour Plumbing Demo',
+      brand_name: 'AskForms',
       website_url: 'https://harbourplumbing.com.au',
       support_email: 'hello@harbourplumbing.com.au',
       license_holder: 'Interactive Demo Mode',
