@@ -11,6 +11,8 @@ function escapeHtml(str) {
 export function renderCommercialSitePage(workspace = {}, defaultFormId = 'template-quote', baseUrl = '') {
   const envObj = typeof process !== 'undefined' && process.env ? process.env : {};
   const priceAud = workspace.price_aud || envObj.LICENSE_PRICE_AUD || '149';
+  const partnerSetupAud = workspace.partner_setup_aud || envObj.PARTNER_SETUP_PRICE_AUD || '99';
+  const partnerName = workspace.partner_name || envObj.PARTNER_NAME || 'TeaGee Labs';
   const templates = Object.values(SHOWCASE_TEMPLATES);
 
   const templateCardsHtml = templates
@@ -66,7 +68,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       --border: rgba(20, 56, 62, 0.11);
       --border-soft: #e6eef1;
       --border-strong: rgba(20, 56, 62, 0.22);
-      --container-max: 1320px;
+      --container-max: min(1440px, 92vw);
       --radius-hero: 44px;
       --radius-card-lg: 28px;
       --radius-card-md: 22px;
@@ -78,11 +80,13 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
     html {
       scroll-behavior: smooth;
       scrollbar-width: none;
+      overflow-x: hidden;
     }
     html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
     body {
       margin: 0;
       padding: 0;
+      overflow-x: hidden;
       font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
       color: var(--ink);
       background: var(--white);
@@ -1216,22 +1220,138 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
     }
     .footer-links a:hover { color: var(--petrol); text-decoration: underline; }
 
-    @media (max-width: 1024px) {
-      .hero-frame, .templates-grid, .steps-grid, .pricing-grid, .faq-grid {
+    .op-mobile-back {
+      display: none;
+      margin-bottom: 12px;
+    }
+
+    /* RESPONSIVE: WIDE SCREENS, LAPTOPS, TABLETS & MOBILE */
+    @media (max-width: 1220px) {
+      .nav-links { gap: 16px; }
+      .op-split { grid-template-columns: 300px minmax(0, 1fr); }
+    }
+
+    @media (max-width: 1080px) {
+      .nav-links { display: none; }
+      .hero-frame {
+        grid-template-columns: 1fr;
+        border-radius: 32px;
+        padding: clamp(26px, 4.5vw, 44px);
+      }
+      .templates-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .pricing-grid {
+        grid-template-columns: 1fr;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      .offer-card.featured {
+        order: -1;
+      }
+      .steps-grid {
         grid-template-columns: 1fr;
       }
-      .op-split {
+      .faq-grid {
         grid-template-columns: 1fr;
       }
+    }
+
+    @media (max-width: 860px) {
+      .section-block { padding: 56px 0; }
       .op-window {
         height: auto;
+        min-height: 520px;
+        max-height: none;
+      }
+      .op-topbar {
+        height: auto;
+        padding: 12px 16px 0;
+        flex-wrap: wrap;
+        row-gap: 8px;
+      }
+      .op-tabs {
+        order: 3;
+        width: 100%;
+        height: 44px;
+        justify-content: space-between;
+        border-top: 1px solid var(--border-soft);
+        margin-top: 4px;
+      }
+      .op-tab {
+        height: 44px;
+        padding: 0 8px;
+        font-size: 13px;
+      }
+      .op-split {
+        height: auto;
+        min-height: 440px;
+        max-height: none;
+        grid-template-columns: 1fr;
       }
       .op-rail {
-        max-height: 260px;
         border-right: 0;
-        border-bottom: 1px solid var(--border-soft);
       }
-      .nav-links { display: none; }
+      .op-window.mobile-detail .op-rail { display: none; }
+      .op-window:not(.mobile-detail) .op-detail-pane { display: none; }
+      .op-detail-pane {
+        height: auto;
+        overflow: visible;
+        padding: 16px;
+      }
+      .op-sheet {
+        height: auto;
+      }
+      .op-sheet-head, .op-action-bar, .op-sheet-body {
+        padding: 16px;
+      }
+      .op-msg {
+        height: auto;
+        max-height: none;
+      }
+      .op-fields-grid {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+      .op-mobile-back {
+        display: inline-flex;
+      }
+      .showcase-card-inner {
+        height: auto;
+        min-height: 310px;
+      }
+      .showcase-copy {
+        height: auto;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 0 16px; }
+      .site-header { padding: 12px 0 6px; }
+      .nav-container { padding: 0 16px; }
+      .nav-left-pill {
+        padding: 7px 14px;
+        gap: 10px;
+      }
+      .brand-logo { font-size: 17px; }
+      .nav-secondary-pill { display: none; }
+      .nav-primary-pill { height: 38px; padding: 0 16px; font-size: 13px; }
+      .hero-frame {
+        border-radius: 26px;
+        padding: 24px 20px;
+      }
+      .hero-title { font-size: 30px; }
+      .hero-cta-group { flex-direction: column; align-items: stretch; }
+      .hero-cta-group > * { width: 100%; }
+      .hero-showcase { padding: 16px; border-radius: 22px; }
+      .showcase-card-inner { padding: 16px; }
+      .showcase-actions { flex-direction: column; }
+      .showcase-actions > * { width: 100%; }
+      .templates-grid { grid-template-columns: 1fr; }
+      .custom-banner { padding: 18px; }
+      .offer-card { padding: 24px 20px; border-radius: 24px; }
+      .checkout-input, .op-search { font-size: 16px; }
+      .op-divider, .op-context, #op-reset-btn { display: none; }
     }
   </style>
 </head>
@@ -1420,7 +1540,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
         </div>
 
         <!-- Authentic Split-Pane Owner Portal Replica -->
-        <div class="op-window reveal" aria-label="Interactive Owner Portal Preview">
+        <div class="op-window reveal" id="op-window-shell" aria-label="Interactive Owner Portal Preview">
           <header class="op-topbar">
             <div class="op-brand-left">
               <svg width="24" height="22" viewBox="0 0 256 240" fill="none" aria-hidden="true">
@@ -1568,8 +1688,8 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
                   <label class="partner-addon-row" for="include-partner-setup">
                     <input type="checkbox" id="include-partner-setup" name="includePartnerSetup" />
                     <span style="font-size:12.5px;line-height:1.4;color:rgba(240,253,250,0.92);">
-                      <strong>Add Partner Setup &amp; Hosting (+$99 AUD)</strong><br />
-                      <span style="color:rgba(230,255,250,0.72);">We deploy, host, and connect AskForms to your site for you.</span>
+                      <strong>Add ${escapeHtml(partnerName)} Setup &amp; Hosting (+$${escapeHtml(partnerSetupAud)} AUD)</strong><br />
+                      <span style="color:rgba(230,255,250,0.72);">${escapeHtml(partnerName)} deploys, hosts, and connects AskForms to your site for you.</span>
                     </span>
                   </label>
                   <button type="submit" class="btn-hero-primary" style="width:100%;height:44px;" id="stripe-buy-btn">
@@ -1578,17 +1698,17 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
                 </form>
 
                 <div id="issued-result" class="result-box">
-                  <div style="font-weight:700;color:var(--petrol);">Payment Verified. Your License Key is Ready:</div>
-                  <div style="margin-top:2px;color:var(--ink-secondary);font-size:12px;">Active for <span class="mono" id="res-domain"></span></div>
-                  <pre class="key-pre" id="res-key"></pre>
+                  <div style="font-weight:700;color:var(--petrol);">Payment Verified</div>
+                  <div style="margin-top:4px;color:var(--ink-secondary);font-size:12.5px;line-height:1.5;" id="res-summary"></div>
                   <div id="res-next-steps" style="margin:10px 0;font-size:12.5px;color:var(--ink-secondary);line-height:1.5;"></div>
                   <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <button type="button" class="btn-tpl-primary" style="flex:1;height:36px;font-size:12.5px;" id="copy-key-btn">Copy Key</button>
-                    <button type="button" class="btn-tpl-secondary" style="height:36px;font-size:12.5px;" id="download-guide-btn">Setup Guide</button>
+                    <button type="button" class="btn-tpl-secondary" style="flex:1;height:36px;font-size:12.5px;" data-launch-template="template-support" data-launch-mode="drawer" data-launch-title="License &amp; Email Support">
+                      Email Support Form
+                    </button>
+                    <button type="button" class="btn-tpl-primary" style="flex:1;height:36px;font-size:12.5px;display:none;" id="addon-partner-btn">
+                      Add ${escapeHtml(partnerName)} Setup ($${escapeHtml(partnerSetupAud)})
+                    </button>
                   </div>
-                  <button type="button" class="btn-tpl-secondary" style="width:100%;height:34px;font-size:12px;margin-top:8px;display:none;" id="addon-partner-btn">
-                    Prefer us to set it up? Add Partner Setup ($99)
-                  </button>
                 </div>
               </div>
             </div>
@@ -1597,14 +1717,14 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
           <!-- Tier 3: Done-For-You Partner Setup & Hosting -->
           <article class="offer-card reveal" style="transition-delay:160ms;">
             <div>
-              <span class="offer-pill">Done-For-You Option</span>
+              <span class="offer-pill">Partner: ${escapeHtml(partnerName)}</span>
               <h3 class="offer-title">Partner Setup &amp; Hosting</h3>
               <div class="offer-price-row">
-                <span class="offer-price">+$99</span>
+                <span class="offer-price">+$${escapeHtml(partnerSetupAud)}</span>
                 <span class="offer-price-note">AUD once-off setup fee</span>
               </div>
               <p style="font-size:14px;color:var(--ink-secondary);margin:0 0 18px;">
-                Want everything handled for you? Our partner team sets up your forms, hosts your workspace, and connects your website buttons.
+                Want everything handled for you? ${escapeHtml(partnerName)} sets up your forms, hosts your workspace, and connects your website buttons.
               </p>
               <ul class="offer-features">
                 <li><span>✓</span><span>Zero technical setup or code required</span></li>
@@ -1668,6 +1788,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
         <a href="#owner-portal">Owner Portal</a>
         <a href="#how-it-works">How It Works</a>
         <a href="#pricing">Pricing</a>
+        <a href="#support" data-launch-template="template-support" data-launch-mode="drawer" data-launch-title="Help &amp; License Support">Help &amp; Support</a>
         <a href="/app">Partner Studio</a>
       </div>
     </div>
@@ -1979,6 +2100,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
         .join('');
 
       detailEl.innerHTML =
+        '<button type="button" class="op-btn op-mobile-back" id="op-mobile-back">&larr; Back to Inbox</button>' +
         '<article class="op-sheet swap-anim">' +
           '<div class="op-sheet-head">' +
             '<div>' +
@@ -2037,10 +2159,15 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       const row = e.target.closest('[data-op-select]');
       if (!row) return;
       opState.selectedId = row.getAttribute('data-op-select');
+      document.getElementById('op-window-shell')?.classList.add('mobile-detail');
       renderOwnerPortal();
     });
 
     document.getElementById('op-detail-pane')?.addEventListener('click', (e) => {
+      if (e.target.closest('#op-mobile-back')) {
+        document.getElementById('op-window-shell')?.classList.remove('mobile-detail');
+        return;
+      }
       const stBtn = e.target.closest('[data-op-status]');
       if (stBtn) {
         const id = stBtn.getAttribute('data-op-status');
@@ -2121,23 +2248,22 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
 
     renderOwnerPortal();
 
-    // 4. Live Stripe Checkout & Post-Purchase Onboarding Kit
+    // 4. Live Stripe Checkout & Email-Only License Verification
     const form = document.getElementById('issue-key-form');
     const stripeBtn = document.getElementById('stripe-buy-btn');
     const partnerCb = document.getElementById('include-partner-setup');
     const resBox = document.getElementById('issued-result');
-    const resDomain = document.getElementById('res-domain');
-    const resKey = document.getElementById('res-key');
+    const resSummary = document.getElementById('res-summary');
     const resNextSteps = document.getElementById('res-next-steps');
     const addonPartnerBtn = document.getElementById('addon-partner-btn');
-    let latestKey = '';
     let latestDomain = '';
     let latestHolder = '';
 
     function syncCheckoutButtonLabel() {
       if (!stripeBtn) return;
       const base = Number(${JSON.stringify(Number(priceAud) || 149)});
-      const total = partnerCb?.checked ? base + 99 : base;
+      const partnerFee = Number(${JSON.stringify(Number(partnerSetupAud) || 99)});
+      const total = partnerCb?.checked ? base + partnerFee : base;
       stripeBtn.textContent = partnerCb?.checked
         ? 'Buy License + Setup · $' + total + ' AUD'
         : 'Buy License · $' + base + ' AUD';
@@ -2178,17 +2304,18 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       fetch('/api/license/verify-session?session_id=' + encodeURIComponent(sessionId))
         .then((r) => r.json())
         .then((data) => {
-          if (data.key && data.payload) {
-            latestKey = data.key;
-            latestDomain = data.payload.domain;
-            latestHolder = data.payload.holder;
-            resDomain.textContent = data.payload.domain;
-            resKey.textContent = data.key;
+          if (data.paid && data.domain) {
+            latestDomain = data.domain;
+            latestHolder = data.holder || data.domain;
+            const targetEmail = data.customerEmail || 'your checkout email address';
+            if (resSummary) {
+              resSummary.innerHTML = 'Your lifetime license key and setup instructions for <strong class="mono">' + esc(data.domain) + '</strong> have been sent to <strong>' + esc(targetEmail) + '</strong>.';
+            }
             if (data.includePartnerSetup) {
-              resNextSteps.innerHTML = '<strong>Partner Setup Included:</strong> Our partner team will deploy and host your forms and contact you at <strong>' + esc(data.customerEmail || 'your checkout email') + '</strong>.';
+              resNextSteps.innerHTML = '<strong>' + esc(data.partnerName || 'TeaGee Labs') + ' Setup Included:</strong> Our partner team has been notified and will reach out to set up and host your forms. Unable to access your email? Use the support form below.';
             } else {
-              resNextSteps.innerHTML = '<strong>Quick Self-Deploy:</strong> Download your setup guide below for the 3-step Git pull and launch instructions, or add Partner Setup anytime.';
-              if (addonPartnerBtn) addonPartnerBtn.style.display = 'block';
+              resNextSteps.innerHTML = 'For security, license keys are sent directly to your email only. Unable to access your email? Reach out via our support form below.';
+              if (addonPartnerBtn) addonPartnerBtn.style.display = 'inline-flex';
             }
             resBox.classList.add('visible');
             document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
@@ -2196,44 +2323,6 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
         })
         .catch(() => {});
     }
-
-    document.getElementById('copy-key-btn')?.addEventListener('click', () => {
-      if (latestKey) {
-        navigator.clipboard.writeText(latestKey);
-        document.getElementById('copy-key-btn').textContent = 'Copied!';
-      }
-    });
-
-    document.getElementById('download-guide-btn')?.addEventListener('click', () => {
-      const guideText = [
-        'AskForms Lifetime Website License & Quick Setup Guide',
-        '=====================================================',
-        'Licensed Domain: ' + latestDomain,
-        'License Holder:  ' + latestHolder,
-        'License Key:     ' + latestKey,
-        '',
-        'STEP 1: Pull AskForms & Install',
-        '  git clone https://github.com/Teegee094/AskForms.git',
-        '  cd AskForms',
-        '  npm install',
-        '',
-        'STEP 2: Launch Your Workspace (Cloudflare Pages or Node 22)',
-        '  npx wrangler d1 create askforms',
-        '  npx wrangler d1 execute askforms --remote --file=./cloudflare/migrations/0001_init.sql',
-        '  npx wrangler pages deploy public --project-name=askforms',
-        '',
-        'STEP 3: Activate Your Domain Key',
-        '  Open https://your-host/app and paste your ASK1 license key above.',
-        '  Then toggle on Email, ntfy, Telegram, Discord, Slack, or WhatsApp alerts under Notifications.',
-        '',
-        'Need our partner to handle hosting & setup for $99 AUD? Visit https://askforms.app/#pricing',
-      ].join('\\n');
-      const blob = new Blob([guideText], { type: 'text/plain;charset=utf-8' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'askforms-setup-' + (latestDomain || 'license') + '.txt';
-      a.click();
-    });
 
     addonPartnerBtn?.addEventListener('click', async () => {
       addonPartnerBtn.disabled = true;
@@ -2254,7 +2343,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       } catch (err) {
         alert(err.message);
         addonPartnerBtn.disabled = false;
-        addonPartnerBtn.textContent = 'Prefer us to set it up? Add Partner Setup ($99)';
+        addonPartnerBtn.textContent = 'Add ${escapeHtml(partnerName)} Setup ($${escapeHtml(partnerSetupAud)})';
       }
     });
   </script>

@@ -382,6 +382,7 @@ const server = http.createServer(async (req, res) => {
       }
       const priceAud = Number(process.env.LICENSE_PRICE_AUD || 149);
       const partnerSetupAud = Number(process.env.PARTNER_SETUP_PRICE_AUD || 99);
+      const partnerName = process.env.PARTNER_NAME || 'TeaGee Labs';
       const includePartnerSetup = Boolean(body.includePartnerSetup);
       const isSetupOnly = body.plan === 'partner-setup-only';
 
@@ -392,6 +393,7 @@ const server = http.createServer(async (req, res) => {
         cancel_url: `${BASE_URL}/?domain=${encodeURIComponent(cleanDomain)}`,
         'metadata[domain]': cleanDomain,
         'metadata[holder]': holder,
+        'metadata[partner_name]': partnerName,
         'metadata[include_partner_setup]': includePartnerSetup || isSetupOnly ? 'true' : 'false',
         'metadata[plan]': isSetupOnly ? 'partner-setup-only' : includePartnerSetup ? 'license-and-setup' : 'license',
       });
@@ -399,8 +401,8 @@ const server = http.createServer(async (req, res) => {
       if (isSetupOnly) {
         params.set('line_items[0][price_data][currency]', 'aud');
         params.set('line_items[0][price_data][unit_amount]', String(Math.round(partnerSetupAud * 100)));
-        params.set('line_items[0][price_data][product_data][name]', `AskForms Partner Setup & Cloudflare Hosting (${cleanDomain})`);
-        params.set('line_items[0][price_data][product_data][description]', `Done-for-you Cloudflare hosting, form setup, and website connection for ${cleanDomain}`);
+        params.set('line_items[0][price_data][product_data][name]', `${partnerName} Partner Setup & Hosting (${cleanDomain})`);
+        params.set('line_items[0][price_data][product_data][description]', `Done-for-you Cloudflare hosting, custom forms, and website connection by ${partnerName} for ${cleanDomain}`);
         params.set('line_items[0][quantity]', '1');
       } else {
         params.set('line_items[0][price_data][currency]', 'aud');
@@ -411,8 +413,8 @@ const server = http.createServer(async (req, res) => {
         if (includePartnerSetup) {
           params.set('line_items[1][price_data][currency]', 'aud');
           params.set('line_items[1][price_data][unit_amount]', String(Math.round(partnerSetupAud * 100)));
-          params.set('line_items[1][price_data][product_data][name]', `Partner Setup & Cloudflare Hosting (${cleanDomain})`);
-          params.set('line_items[1][price_data][product_data][description]', `Done-for-you Cloudflare deployment, custom form build, and website button connection`);
+          params.set('line_items[1][price_data][product_data][name]', `${partnerName} Setup & Hosting (${cleanDomain})`);
+          params.set('line_items[1][price_data][product_data][description]', `Done-for-you Cloudflare deployment, custom form build, and website connection by ${partnerName}`);
           params.set('line_items[1][quantity]', '1');
         }
       }
@@ -454,14 +456,12 @@ const server = http.createServer(async (req, res) => {
       }
       const cleanDomain = normalizeDomain(session.metadata?.domain || '');
       const holder = String(session.metadata?.holder || cleanDomain).trim();
+      const partnerName = String(session.metadata?.partner_name || process.env.PARTNER_NAME || 'TeaGee Labs').trim();
       const includePartnerSetup = session.metadata?.include_partner_setup === 'true';
       const customerEmail = session.customer_details?.email || '';
       const { key, payload } = issueLicenseKey({ domain: cleanDomain, holder });
-      setSetting('license_key', key);
-      setSetting('license_holder', payload.holder);
-      setSetting('website_url', `https://${payload.domain}`);
 
-      // Optionally email onboarding kit via Resend if configured
+      // Deliver license key exclusively to the checkout email (never exposed in browser JSON)
       const resendKey = process.env.RESEND_API_KEY || getSetting('resend_api_key') || '';
       let emailSent = false;
       if (resendKey && customerEmail) {
@@ -472,8 +472,8 @@ const server = http.createServer(async (req, res) => {
             body: JSON.stringify({
               from: process.env.MAIL_FROM || 'AskForms <onboarding@resend.dev>',
               to: [customerEmail],
-              subject: `Your AskForms License Key & Setup Kit (${cleanDomain})`,
-              html: `<div style="font-family:Inter,sans-serif;max-width:580px;margin:0 auto;padding:24px;color:#12262a;"><h2 style="color:#14383e;">Welcome to AskForms!</h2><p>Your lifetime website license for <strong>${cleanDomain}</strong> is ready.</p><pre style="background:#0c262b;color:#4fd1c5;padding:14px;border-radius:10px;word-break:break-all;white-space:pre-wrap;">${key}</pre>${includePartnerSetup ? '<p><strong>Partner Setup Included:</strong> Our partner team has been notified and will reach out to deploy and host your AskForms workspace on Cloudflare.</p>' : '<p><strong>Self-Deploy Quick Start:</strong> Pull the AskForms repo, run <code>npm install &amp;&amp; npm run deploy:cf</code>, and paste your license key inside <code>/app</code>.</p>'}</div>`,
+              subject: `Your AskForms License Key & Setup Instructions (${cleanDomain})`,
+              html: `<div style="font-family:Inter,sans-serif;max-width:580px;margin:0 auto;padding:24px;color:#12262a;"><h2 style="color:#14383e;">Welcome to AskForms!</h2><p>Your lifetime website license for <strong>${cleanDomain}</strong> is active.</p><pre style="background:#0c262b;color:#4fd1c5;padding:14px;border-radius:10px;word-break:break-all;white-space:pre-wrap;">${key}</pre>${includePartnerSetup ? `<p><strong>${partnerName} Setup Included:</strong> ${partnerName} has been notified and will reach out to deploy and host your AskForms workspace on Cloudflare.</p>` : '<p><strong>Quick Self-Deploy (3 Steps):</strong><br/>1. <code>git clone https://github.com/Teegee094/AskForms.git &amp;&amp; cd AskForms &amp;&amp; npm install</code><br/>2. <code>npm run deploy:cf</code><br/>3. Open <code>/app</code> on your deployment and paste your license key above.</p>'}</div>`,
             }),
           });
           emailSent = mailRes.ok;
@@ -482,12 +482,12 @@ const server = http.createServer(async (req, res) => {
 
       return sendJson(res, 200, {
         paid: true,
-        key,
-        payload,
+        domain: payload.domain,
+        holder: payload.holder,
+        partnerName,
         includePartnerSetup,
         customerEmail,
         emailSent,
-        workspace: getWorkspaceConfig(),
       });
     }
 
