@@ -555,18 +555,27 @@ export function renderEmbedPage(form, fields, baseUrl, workspace = {}) {
       <div id="embed-done" class="done-state" role="status">
         <h2 class="done-title">${escapeHtml(thanksHeading)}</h2>
         <p class="done-body">${escapeHtml(thanksBody)}</p>
-        <button type="button" id="embed-reset" class="btn-secondary" style="margin-top:0;padding:8px 16px;font-size:13px;">Send another enquiry</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${
+            String(form.id || '').startsWith('template-')
+              ? `<button type="button" id="embed-view-portal" class="btn-primary" style="margin-top:0;padding:9px 16px;font-size:13px;">See in Owner Portal Preview &rarr;</button>`
+              : ''
+          }
+          <button type="button" id="embed-reset" class="btn-secondary" style="margin-top:0;padding:8px 16px;font-size:13px;">Send another enquiry</button>
+        </div>
       </div>
       ${
-        workspace?.license?.domainMismatch
+        String(form.id || '').startsWith('template-')
+          ? ''
+          : workspace?.license?.domainMismatch
           ? `<div style="margin-top:14px;padding:10px 12px;border-radius:10px;background:#fff5f5;border:1px solid #fed7d7;color:#c53030;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:8px;">
               <span>${escapeHtml(workspace.license.message)}</span>
-              <a href="/site" target="_blank" rel="noopener" style="color:#c53030;text-decoration:underline;white-space:nowrap;">Get Key &rarr;</a>
+              <a href="/#pricing" target="_blank" rel="noopener" style="color:#c53030;text-decoration:underline;white-space:nowrap;">Get Key &rarr;</a>
             </div>`
           : !workspace?.license?.isLicensed
           ? `<div style="margin-top:14px;padding:9px 12px;border-radius:10px;background:#f1f5f9;border:1px solid #e2e8f0;color:#3e525c;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
               <span><strong>AskForms Preview Mode</strong> · ${workspace?.license?.previewRemaining ?? 5} test enquiries left</span>
-              <a href="/site" target="_blank" rel="noopener" style="color:${theme.accent};font-weight:700;text-decoration:none;white-space:nowrap;">Activate Domain Key &rarr;</a>
+              <a href="/#pricing" target="_blank" rel="noopener" style="color:${theme.accent};font-weight:700;text-decoration:none;white-space:nowrap;">Activate Domain Key &rarr;</a>
             </div>`
           : ''
       }
@@ -640,13 +649,30 @@ export function renderEmbedPage(form, fields, baseUrl, workspace = {}) {
       const orig = btn.textContent;
       btn.textContent = 'Sending...';
       try {
+        const fd = new FormData(form);
+        const submittedFields = {};
+        for (const [k, v] of fd.entries()) {
+          if (typeof v === 'string' && !k.startsWith('_') && k !== 'rating') {
+            submittedFields[k] = v;
+          }
+        }
         const res = await fetch(form.action, {
           method: 'POST',
           headers: { 'Accept': 'application/json' },
-          body: new FormData(form),
+          body: fd,
         });
         const data = await res.json();
         if (data.ok) {
+          if (window.parent !== window) {
+            window.parent.postMessage({
+              type: 'askforms:submitted',
+              formId: ${JSON.stringify(form.id)},
+              formName: ${JSON.stringify(form.name)},
+              submissionId: data.submissionId || ('sub_' + Date.now()),
+              fields: submittedFields,
+              createdAt: new Date().toISOString(),
+            }, '*');
+          }
           form.classList.add('hidden');
           done.classList.add('visible');
           form.reset();
@@ -661,6 +687,12 @@ export function renderEmbedPage(form, fields, baseUrl, workspace = {}) {
       } finally {
         btn.disabled = false;
         btn.textContent = orig;
+      }
+    });
+
+    document.getElementById('embed-view-portal')?.addEventListener('click', () => {
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'askforms:open-portal-preview' }, '*');
       }
     });
 

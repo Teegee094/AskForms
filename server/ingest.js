@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { db, getWorkspaceConfig } from './db.js';
 import { parseMultipart } from './multipart.js';
 import { dispatchSubmissionEmails, interpolateTemplate } from './mailer.js';
+import { getShowcaseTemplate } from './templates.js';
 import { dispatchWebhooks } from './webhooks.js';
 
 const SPECIAL_KEYS = new Set([
@@ -108,6 +109,15 @@ export async function handleIngestPost(req, res, formId, baseUrl) {
     (req.headers['content-type'] || '').includes('application/json');
 
   applyCorsHeaders(res, origin);
+
+  const showcaseTpl = getShowcaseTemplate(formId);
+  if (showcaseTpl) {
+    await readRawBody(req).catch(() => {});
+    const subId = `demo_${crypto.randomBytes(4).toString('hex')}`;
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: true, isDemoTemplate: true, submissionId: subId }));
+    return;
+  }
 
   const trace = [];
   const form = db.prepare('SELECT * FROM forms WHERE id = ?').get(formId);

@@ -41,6 +41,7 @@ import { parseMultipart } from './multipart.js';
 import { renderClientDemoPage, renderEmbedPage, renderThanksPage } from './pages.js';
 import { renderCommercialSitePage } from './site-page.js';
 import { seedIfEmpty } from './seed.js';
+import { getShowcaseTemplate } from './templates.js';
 import { dispatchWebhooks } from './webhooks.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -185,7 +186,7 @@ const server = http.createServer(async (req, res) => {
 
     const embedMatch = pathname.match(/^\/embed\/([a-zA-Z0-9_-]+)\/?$/);
     if (embedMatch && method === 'GET') {
-      const form = db.prepare('SELECT * FROM forms WHERE id = ?').get(embedMatch[1]);
+      const form = db.prepare('SELECT * FROM forms WHERE id = ?').get(embedMatch[1]) || getShowcaseTemplate(embedMatch[1]);
       if (!form) {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('Form not found');

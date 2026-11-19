@@ -1,6 +1,7 @@
 import { renderManagePortalPage, renderManifestJson } from '../server/manage-page.js';
 import { renderClientDemoPage, renderEmbedPage, renderThanksPage } from '../server/pages.js';
 import { renderCommercialSitePage } from '../server/site-page.js';
+import { getShowcaseTemplate } from '../server/templates.js';
 
 const DEFAULT_FIELDS = [
   { name: 'name', label: 'Full name', type: 'text', placeholder: 'Alex Mercer', required: true, half: true },
@@ -274,7 +275,7 @@ export async function onRequest(context) {
 
   const embedMatch = pathname.match(/^\/embed\/([a-zA-Z0-9_-]+)\/?$/);
   if (embedMatch && method === 'GET') {
-    const form = await db.prepare('SELECT * FROM forms WHERE id = ?').bind(embedMatch[1]).first();
+    const form = (await db.prepare('SELECT * FROM forms WHERE id = ?').bind(embedMatch[1]).first()) || getShowcaseTemplate(embedMatch[1]);
     if (!form) return new Response('Form not found', { status: 404 });
     const reqSource = request.headers.get('Origin') || request.headers.get('Referer') || '';
     return htmlResp(200, renderEmbedPage(form, parseFields(form), baseUrl, await getWorkspace(db, reqSource)));
@@ -299,6 +300,10 @@ export async function onRequest(context) {
     }
     if (method !== 'POST') {
       return jsonResp(405, { error: 'Use POST' }, corsHeaders(origin));
+    }
+    const showcaseTpl = getShowcaseTemplate(formId);
+    if (showcaseTpl) {
+      return jsonResp(200, { ok: true, isDemoTemplate: true, submissionId: `demo_${crypto.randomUUID().slice(0, 8)}` }, corsHeaders(origin));
     }
     const form = await db.prepare('SELECT * FROM forms WHERE id = ?').bind(formId).first();
     if (!form) return jsonResp(404, { ok: false, error: 'Form not found' }, corsHeaders(origin));
