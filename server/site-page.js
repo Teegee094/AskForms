@@ -15,6 +15,76 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
   const partnerName = workspace.partner_name || envObj.PARTNER_NAME || 'TeaGee Labs';
   const templates = Object.values(SHOWCASE_TEMPLATES);
 
+  const marqueeItems = [
+    {
+      name: 'Email',
+      tag: 'Free',
+      svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="3" fill="#14383E"/><path d="M3 6.5L12 13L21 6.5" stroke="#4FD1C5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    },
+    {
+      name: 'ntfy Push',
+      tag: 'Open Source',
+      svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="3" width="20" height="16" rx="4" fill="#317F6F"/><path d="M7 9.5L10.5 12L7 14.5M12.5 14.5H17" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    },
+    {
+      name: 'Telegram',
+      tag: 'Unlimited',
+      svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="#229ED9"/><path d="M16.9 7.8L15.1 16.3C14.96 16.92 14.6 17.07 14.1 16.78L11.35 14.75L10.02 16.03C9.87 16.18 9.75 16.3 9.46 16.3L9.66 13.5L14.75 8.9C14.97 8.7 14.7 8.6 14.41 8.8L8.12 12.76L5.41 11.91C4.82 11.73 4.81 11.32 5.53 11.04L16.12 6.96C16.61 6.78 17.04 7.08 16.9 7.8Z" fill="#FFFFFF"/></svg>`,
+    },
+    {
+      name: 'Discord',
+      tag: 'Unlimited',
+      svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4C14.82 4.33 14.6 4.77 14.46 5.12C12.86 4.88 11.27 4.88 9.7 5.12C9.55 4.77 9.33 4.33 9.15 4C7.65 4.26 6.21 4.71 4.88 5.33C2.17 9.38 1.44 13.34 1.81 17.24C3.58 18.55 5.3 19.35 6.99 19.87C7.41 19.3 7.78 18.69 8.1 18.04C7.49 17.81 6.91 17.53 6.36 17.2C6.5 17.09 6.64 16.98 6.78 16.87C10.12 18.42 13.75 18.42 17.05 16.87C17.19 16.98 17.33 17.09 17.47 17.2C16.92 17.53 16.34 17.81 15.73 18.04C16.05 18.69 16.42 19.3 16.84 19.87C18.53 19.35 20.25 18.55 22.02 17.24C22.45 12.71 21.28 8.79 19.27 5.33ZM8.68 14.84C7.67 14.84 6.84 13.91 6.84 12.77C6.84 11.63 7.65 10.69 8.68 10.69C9.71 10.69 10.54 11.63 10.52 12.77C10.52 13.91 9.71 14.84 8.68 14.84ZM15.15 14.84C14.14 14.84 13.31 13.91 13.31 12.77C13.31 11.63 14.12 10.69 15.15 10.69C16.18 10.69 17.01 11.63 16.99 12.77C16.99 13.91 16.18 14.84 15.15 14.84Z" fill="#5865F2"/></svg>`,
+    },
+    {
+      name: 'Slack',
+      tag: 'Free',
+      svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6.1 15.2a2.1 2.1 0 1 1-2.1-2.1h2.1v2.1zm1.05 0a2.1 2.1 0 1 1 4.2 0v5.25a2.1 2.1 0 1 1-4.2 0V15.2z" fill="#E01E5A"/><path d="M9.25 6.1a2.1 2.1 0 1 1 2.1-2.1v2.1h-2.1zm0 1.05a2.1 2.1 0 1 1 0 4.2H4a2.1 2.1 0 1 1 0-4.2h5.25z" fill="#36C5F0"/><path d="M18.35 9.25a2.1 2.1 0 1 1 2.1 2.1h-2.1v-2.1zm-1.05 0a2.1 2.1 0 1 1-4.2 0V4a2.1 2.1 0 1 1 4.2 0v5.25z" fill="#2EB67D"/><path d="M15.2 18.35a2.1 2.1 0 1 1-2.1 2.1v-2.1h2.1zm0-1.05a2.1 2.1 0 1 1 0-4.2h5.25a2.1 2.1 0 1 1 0 4.2H15.2z" fill="#ECB22E"/></svg>`,
+    },
+    {
+      name: 'WhatsApp',
+      tag: 'Direct Push',
+      svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.38 5.07L2 22l5.09-1.34A9.94 9.94 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2z" fill="#25D366"/><path d="M16.6 14.2c-.25-.12-1.48-.73-1.71-.81-.23-.08-.4-.12-.56.12-.17.25-.64.81-.79.98-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.48-1.39-1.73-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.49-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.87.85-.87 2.08s.89 2.41 1.02 2.58c.12.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.48-.6 1.69-1.19.21-.58.21-1.08.15-1.19-.06-.1-.23-.16-.48-.29z" fill="#FFFFFF"/></svg>`,
+    },
+    {
+      name: 'Microsoft Teams',
+      tag: 'Free',
+      svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="5" width="13" height="14" rx="2.5" fill="#4B53BC"/><path d="M5.5 9.2H11.5V10.7H9.3V15.5H7.7V10.7H5.5V9.2Z" fill="#FFFFFF"/><circle cx="18.2" cy="8.2" r="2.3" fill="#7B83EB"/><path d="M15.8 11.4H20.6C21.4 11.4 22 12 22 12.8V16.2C22 17.6 20.9 18.8 19.5 18.8H16.2V11.4H15.8Z" fill="#7B83EB"/></svg>`,
+    },
+    {
+      name: 'Google Chat',
+      tag: 'Free',
+      svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4H16C17.1 4 18 4.9 18 6V13C18 14.1 17.1 15 16 15H9L5 19V6C5 4.9 5.9 4 7 4H5Z" fill="#00AC47"/><path d="M9 8H19C20.1 8 21 8.9 21 10V17C21 18.1 20.1 19 19 19H12L8 22V10C8 8.9 8.9 8 10 8H9Z" fill="#00832D" fill-opacity="0.88"/></svg>`,
+    },
+    {
+      name: 'LINE',
+      tag: 'Messaging',
+      svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3C6.75 3 2.5 6.45 2.5 10.7c0 3.81 3.38 7 7.95 7.6.31.07.73.21.84.48.1.25.06.64.03.89l-.14.83c-.04.25-.2.97.85.53 1.05-.44 5.66-3.33 7.72-5.7 1.42-1.56 1.75-3.05 1.75-4.63C21.5 6.45 17.25 3 12 3z" fill="#06C755"/><path d="M8.5 12.7H6.8V9.2h1v2.6h.7v.9zm1.7 0h-1V9.2h1v3.5zm3.7 0h-.9l-1.3-1.9v1.9h-.9V9.2h.9l1.3 1.9V9.2h.9v3.5zm3.3-2.6h-1.3v.4h1.3v.9h-1.3v.4h1.3v.9h-2.3V9.2h2.3v.9z" fill="#FFFFFF"/></svg>`,
+    },
+    {
+      name: 'WeChat Work',
+      tag: 'Group Alerts',
+      svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><ellipse cx="9.2" cy="10.2" rx="6.7" ry="5.6" fill="#07C160"/><circle cx="7.1" cy="9.4" r="0.9" fill="#FFFFFF"/><circle cx="11.3" cy="9.4" r="0.9" fill="#FFFFFF"/><ellipse cx="15.4" cy="14.7" rx="5.6" ry="4.7" fill="#2AAE67" stroke="#FFFFFF" stroke-width="1.2"/><circle cx="13.7" cy="14.2" r="0.75" fill="#FFFFFF"/><circle cx="17.1" cy="14.2" r="0.75" fill="#FFFFFF"/></svg>`,
+    },
+    {
+      name: 'Gotify Push',
+      tag: 'Open Source',
+      svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#1E88E5"/><path d="M12 6.2C9.6 6.2 7.8 8 7.8 10.4V13.4L6.5 15.2H17.5L16.2 13.4V10.4C16.2 8 14.4 6.2 12 6.2Z" fill="#FFFFFF"/><circle cx="12" cy="16.9" r="1.4" fill="#FFFFFF"/></svg>`,
+    },
+    {
+      name: 'Custom Webhooks',
+      tag: 'Any CRM',
+      svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="6.5" r="2.7" stroke="#14383E" stroke-width="2"/><circle cx="6.8" cy="16.5" r="2.7" stroke="#14383E" stroke-width="2"/><circle cx="17.2" cy="16.5" r="2.7" stroke="#4FD1C5" stroke-width="2"/><path d="M10.7 8.9L8.1 14.1M13.3 8.9L15.9 14.1M9.5 16.5H14.5" stroke="#14383E" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+    },
+  ];
+
+  const marqueeTrackHtml = [...marqueeItems, ...marqueeItems]
+    .map(
+      (item) =>
+        `<span class="marquee-pill">${item.svg}<span>${escapeHtml(item.name)}</span><span class="marquee-pill-tag">${escapeHtml(item.tag)}</span></span>`
+    )
+    .join('');
+
   const templateCardsHtml = templates
     .map(
       (tpl, idx) => `
@@ -1470,30 +1540,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       </div>
       <div class="marquee-viewport">
         <div class="marquee-track">
-          <span class="marquee-pill">Email <span class="marquee-pill-tag">Free</span></span>
-          <span class="marquee-pill">ntfy Mobile Push <span class="marquee-pill-tag">Open Source</span></span>
-          <span class="marquee-pill">Telegram <span class="marquee-pill-tag">Unlimited</span></span>
-          <span class="marquee-pill">Discord <span class="marquee-pill-tag">Unlimited</span></span>
-          <span class="marquee-pill">Slack <span class="marquee-pill-tag">Free</span></span>
-          <span class="marquee-pill">WhatsApp <span class="marquee-pill-tag">Direct Push</span></span>
-          <span class="marquee-pill">Microsoft Teams <span class="marquee-pill-tag">Free</span></span>
-          <span class="marquee-pill">Google Chat <span class="marquee-pill-tag">Free</span></span>
-          <span class="marquee-pill">LINE <span class="marquee-pill-tag">Messaging</span></span>
-          <span class="marquee-pill">WeChat Work <span class="marquee-pill-tag">Group Alerts</span></span>
-          <span class="marquee-pill">Gotify Push <span class="marquee-pill-tag">Open Source</span></span>
-          <span class="marquee-pill">Custom Webhooks <span class="marquee-pill-tag">Any CRM</span></span>
-          <span class="marquee-pill">Email <span class="marquee-pill-tag">Free</span></span>
-          <span class="marquee-pill">ntfy Mobile Push <span class="marquee-pill-tag">Open Source</span></span>
-          <span class="marquee-pill">Telegram <span class="marquee-pill-tag">Unlimited</span></span>
-          <span class="marquee-pill">Discord <span class="marquee-pill-tag">Unlimited</span></span>
-          <span class="marquee-pill">Slack <span class="marquee-pill-tag">Free</span></span>
-          <span class="marquee-pill">WhatsApp <span class="marquee-pill-tag">Direct Push</span></span>
-          <span class="marquee-pill">Microsoft Teams <span class="marquee-pill-tag">Free</span></span>
-          <span class="marquee-pill">Google Chat <span class="marquee-pill-tag">Free</span></span>
-          <span class="marquee-pill">LINE <span class="marquee-pill-tag">Messaging</span></span>
-          <span class="marquee-pill">WeChat Work <span class="marquee-pill-tag">Group Alerts</span></span>
-          <span class="marquee-pill">Gotify Push <span class="marquee-pill-tag">Open Source</span></span>
-          <span class="marquee-pill">Custom Webhooks <span class="marquee-pill-tag">Any CRM</span></span>
+          ${marqueeTrackHtml}
         </div>
       </div>
     </section>
