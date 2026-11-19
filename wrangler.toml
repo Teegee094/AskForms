@@ -1,0 +1,11 @@
+name = "askforms"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = "public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "askforms"
+database_id = "096c91b3-dfdb-4ebd-916c-1e460ad7e0b2"
+
+[vars]
+PUBLIC_URL = "https://askforms.app"

@@ -1,19 +1,11 @@
 name = "askforms"
-compatibility_date = "2026-01-01"
+compatibility_date = "2025-01-01"
 pages_build_output_dir = "../public"
 
-# Create D1 database: npx wrangler d1 create askforms
-# Apply schema:       npx wrangler d1 execute askforms --file=./cloudflare/migrations/0001_init.sql
 [[d1_databases]]
 binding = "DB"
 database_name = "askforms"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "096c91b3-dfdb-4ebd-916c-1e460ad7e0b2"
 
 [vars]
 PUBLIC_URL = "https://askforms.app"
-# Optional: set secrets with `npx wrangler pages secret put WEBHOOK_URL`
-# WEBHOOK_URL    — Default outbound webhook (Slack, Teams, Discord, Make, Zapier, n8n)
-# WEBHOOK_FORMAT — generic | slack | discord | teams
-# WEBHOOK_SECRET — HMAC-SHA256 signing secret
-# RESEND_API_KEY — Optional Resend HTTP email API key
-# NOTIFY_EMAIL   — Default notification recipient email
