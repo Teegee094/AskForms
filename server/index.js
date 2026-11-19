@@ -36,6 +36,7 @@ import {
   UPLOADS_DIR,
 } from './db.js';
 import { dispatchSingleChannel, NOTIFICATION_CHANNEL_DEFS, parseChannelsConfig } from './channels.js';
+import { MCP_TOOLS_MANIFEST, parseNaturalLanguageForm, runScopedAssistant } from './mcp.js';
 import { handleIngestOptions, handleIngestPost } from './ingest.js';
 import { renderManagePortalPage, renderManifestJson } from './manage-page.js';
 import { issueLicenseKey, normalizeDomain, verifyLicenseKey } from './license.js';
@@ -491,6 +492,67 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // MCP (Model Context Protocol) Endpoint — supports Bearer token or session cookie
+    if (pathname === '/api/mcp' && method === 'POST') {
+      const authHeader = req.headers.authorization || '';
+      const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+      if (!isRequestAuthenticated(req) && !verifyAdminPassword(bearer)) {
+        return sendJson(res, 401, { jsonrpc: '2.0', error: { code: -32001, message: 'Unauthorized MCP request.' } });
+      }
+      const rpc = await readJsonBody(req).catch(() => ({}));
+      const id = rpc.id ?? 1;
+      if (rpc.method === 'initialize') {
+        return sendJson(res, 200, {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            protocolVersion: '2024-11-05',
+            serverInfo: { name: 'AskForms MCP Server', version: '1.0.0' },
+            capabilities: { tools: {} },
+          },
+        });
+      }
+      if (rpc.method === 'tools/list') {
+        return sendJson(res, 200, { jsonrpc: '2.0', id, result: { tools: MCP_TOOLS_MANIFEST } });
+      }
+      if (rpc.method === 'tools/call') {
+        const toolName = rpc.params?.name;
+        const args = rpc.params?.arguments || {};
+        if (toolName === 'list_forms') {
+          return sendJson(res, 200, { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(listFormsWithCounts(), null, 2) }] } });
+        }
+        if (toolName === 'get_analytics') {
+          return sendJson(res, 200, { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(getGlobalStats(), null, 2) }] } });
+        }
+        if (toolName === 'get_recent_enquiries') {
+          const limit = Math.min(50, Number(args.limit) || 10);
+          const q = String(args.query || '').trim().toLowerCase();
+          const rows = db
+            .prepare('SELECT s.*, f.name AS form_name FROM submissions s JOIN forms f ON f.id = s.form_id WHERE s.is_spam = 0 ORDER BY s.created_at DESC LIMIT ?')
+            .all(limit)
+            .map((r) => ({ ...r, data: JSON.parse(r.data_json || '{}') }))
+            .filter((r) => !q || JSON.stringify(r).toLowerCase().includes(q));
+          return sendJson(res, 200, { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(rows, null, 2) }] } });
+        }
+        if (toolName === 'create_form') {
+          const draft = parseNaturalLanguageForm(args.prompt || args.name || 'Custom Form');
+          const formName = String(args.name || draft.name).trim();
+          const clientName = String(args.client_name || draft.client_name).trim();
+          const fields = Array.isArray(args.fields) && args.fields.length > 0 ? args.fields : draft.fields;
+          db.prepare(
+            `INSERT INTO forms (id, name, client_name, theme_preset, email_recipients, allowed_origins, fields_json, submit_label, multi_step, review_gate_url)
+             VALUES (?, ?, ?, 'teagee', '', '*', ?, ?, ?, '')`
+          ).run(draft.id, formName, clientName, JSON.stringify(fields), draft.submit_label, draft.multi_step ? 1 : 0);
+          return sendJson(res, 200, {
+            jsonrpc: '2.0',
+            id,
+            result: { content: [{ type: 'text', text: JSON.stringify({ created: true, id: draft.id, name: formName, embedUrl: `${BASE_URL}/embed/${draft.id}` }, null, 2) }] },
+          });
+        }
+      }
+      return sendJson(res, 200, { jsonrpc: '2.0', id, error: { code: -32601, message: 'Method not found' } });
+    }
+
     // Gate all admin API routes when ADMIN_PASSWORD is active
     if (pathname.startsWith('/api/') && !isRequestAuthenticated(req)) {
       return sendJson(res, 401, { error: 'Authentication required.', authRequired: true });
@@ -511,6 +573,23 @@ const server = http.createServer(async (req, res) => {
       const nextCfg = body.config && typeof body.config === 'object' ? body.config : {};
       setSetting('notification_channels_json', JSON.stringify(nextCfg));
       return sendJson(res, 200, { saved: true, config: nextCfg });
+    }
+
+    if (pathname === '/api/assistant' && method === 'POST') {
+      const body = await readJsonBody(req);
+      const forms = listFormsWithCounts();
+      const subs = db
+        .prepare('SELECT s.*, f.name AS form_name FROM submissions s LEFT JOIN forms f ON f.id = s.form_id ORDER BY s.created_at DESC LIMIT 100')
+        .all()
+        .map((r) => ({ ...r, data: JSON.parse(r.data_json || '{}') }));
+      const reply = await runScopedAssistant({
+        message: body.message,
+        forms,
+        submissions: subs,
+        stats: getGlobalStats(),
+        byok: body.byok || {},
+      });
+      return sendJson(res, 200, reply);
     }
 
     if (pathname === '/api/channels/test' && method === 'POST') {

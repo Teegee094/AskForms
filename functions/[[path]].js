@@ -3,6 +3,7 @@ import { renderClientDemoPage, renderEmbedPage, renderThanksPage } from '../serv
 import { renderCommercialSitePage } from '../server/site-page.js';
 import { getShowcaseTemplate } from '../server/templates.js';
 import { dispatchAllEnabledChannels, dispatchSingleChannel, NOTIFICATION_CHANNEL_DEFS, parseChannelsConfig } from '../server/channels.js';
+import { MCP_TOOLS_MANIFEST, parseNaturalLanguageForm, runScopedAssistant } from '../server/mcp.js';
 
 const DEFAULT_FIELDS = [
   { name: 'name', label: 'Full name', type: 'text', placeholder: 'Alex Mercer', required: true, half: true },
@@ -583,6 +584,70 @@ export async function onRequest(context) {
     });
   }
 
+  // MCP (Model Context Protocol) Endpoint — supports Bearer token or session cookie
+  if (pathname === '/api/mcp' && method === 'POST') {
+    const authHeader = request.headers.get('Authorization') || '';
+    const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    const adminPass = String(env.ADMIN_PASSWORD || 'askforms2026').trim();
+    const isBearerValid = Boolean(bearer && (bearer === adminPass || (bearer.startsWith('ASK1.') && parseKeyPayload(bearer))));
+    if (!isEdgeAuthed && !isBearerValid) {
+      return jsonResp(401, { jsonrpc: '2.0', error: { code: -32001, message: 'Unauthorized MCP request.' } });
+    }
+    const rpc = await request.json().catch(() => ({}));
+    const id = rpc.id ?? 1;
+    if (rpc.method === 'initialize') {
+      return jsonResp(200, {
+        jsonrpc: '2.0',
+        id,
+        result: {
+          protocolVersion: '2024-11-05',
+          serverInfo: { name: 'AskForms MCP Server', version: '1.0.0' },
+          capabilities: { tools: {} },
+        },
+      });
+    }
+    if (rpc.method === 'tools/list') {
+      return jsonResp(200, { jsonrpc: '2.0', id, result: { tools: MCP_TOOLS_MANIFEST } });
+    }
+    if (rpc.method === 'tools/call') {
+      const toolName = rpc.params?.name;
+      const args = rpc.params?.arguments || {};
+      if (toolName === 'list_forms') {
+        return jsonResp(200, { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(await listFormsWithCounts(db), null, 2) }] } });
+      }
+      if (toolName === 'get_analytics') {
+        return jsonResp(200, { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(await getStats(db), null, 2) }] } });
+      }
+      if (toolName === 'get_recent_enquiries') {
+        const limit = Math.min(50, Number(args.limit) || 10);
+        const q = String(args.query || '').trim().toLowerCase();
+        const rows = ((await db.prepare('SELECT s.*, f.name AS form_name FROM submissions s JOIN forms f ON f.id = s.form_id WHERE s.is_spam = 0 ORDER BY s.created_at DESC LIMIT ?').bind(limit).all()).results || [])
+          .map((r) => ({ ...r, data: JSON.parse(r.data_json || '{}') }))
+          .filter((r) => !q || JSON.stringify(r).toLowerCase().includes(q));
+        return jsonResp(200, { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(rows, null, 2) }] } });
+      }
+      if (toolName === 'create_form') {
+        const draft = parseNaturalLanguageForm(args.prompt || args.name || 'Custom Form');
+        const formName = String(args.name || draft.name).trim();
+        const clientName = String(args.client_name || draft.client_name).trim();
+        const fields = Array.isArray(args.fields) && args.fields.length > 0 ? args.fields : draft.fields;
+        await db
+          .prepare(
+            `INSERT INTO forms (id, name, client_name, theme_preset, email_recipients, allowed_origins, fields_json, submit_label, multi_step, review_gate_url)
+             VALUES (?, ?, ?, 'teagee', '', '*', ?, ?, ?, '')`
+          )
+          .bind(draft.id, formName, clientName, JSON.stringify(fields), draft.submit_label, draft.multi_step ? 1 : 0)
+          .run();
+        return jsonResp(200, {
+          jsonrpc: '2.0',
+          id,
+          result: { content: [{ type: 'text', text: JSON.stringify({ created: true, id: draft.id, name: formName, embedUrl: `${baseUrl}/embed/${draft.id}` }, null, 2) }] },
+        });
+      }
+    }
+    return jsonResp(200, { jsonrpc: '2.0', id, error: { code: -32601, message: 'Method not found' } });
+  }
+
   // Gate all remaining /api/* admin routes behind authentication
   if (pathname.startsWith('/api/') && !isEdgeAuthed) {
     return jsonResp(401, { error: 'Authentication required.', authRequired: true });
@@ -601,6 +666,21 @@ export async function onRequest(context) {
     const nextCfg = body.config && typeof body.config === 'object' ? body.config : {};
     await setSetting(db, 'notification_channels_json', JSON.stringify(nextCfg));
     return jsonResp(200, { saved: true, config: nextCfg });
+  }
+
+  if (pathname === '/api/assistant' && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    const forms = await listFormsWithCounts(db);
+    const rows = (await db.prepare('SELECT s.*, f.name AS form_name FROM submissions s LEFT JOIN forms f ON f.id = s.form_id ORDER BY s.created_at DESC LIMIT 100').all()).results || [];
+    const subs = rows.map((r) => ({ ...r, data: JSON.parse(r.data_json || '{}') }));
+    const reply = await runScopedAssistant({
+      message: body.message,
+      forms,
+      submissions: subs,
+      stats: await getStats(db),
+      byok: body.byok || {},
+    });
+    return jsonResp(200, reply);
   }
 
   if (pathname === '/api/channels/test' && method === 'POST') {

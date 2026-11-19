@@ -1,4 +1,4 @@
-import { api, copyText, escapeHtml, formatRelativeTime, formatTimestamp } from './api.js';
+import { api, copyText, escapeHtml, formatRelativeTime, formatTimestamp, isDemoMode } from './api.js';
 import { icons } from './icons.js';
 
 const state = {
@@ -83,6 +83,15 @@ const state = {
   sandboxResult: null,
   channelsDefs: [],
   channelsConfig: {},
+  assistantMessages: [
+    {
+      role: 'assistant',
+      text: 'Hi! I am your built-in AskForms assistant (free, no API key required). I can help you:\n• Create a custom pop-out form from plain English\n• Search and query your enquiry inbox\n• Summarise your live form analytics\n\nWhat would you like to do?',
+    },
+  ],
+  assistantDraftForm: null,
+  assistantByok: { provider: 'gemini', apiKey: '' },
+  partnerIssuedKey: null,
 };
 
 const els = {
@@ -268,20 +277,30 @@ function renderTopbar() {
   }
 
   els.topbar.innerHTML = `
-    <div class="header-left" aria-hidden="true"></div>
+    <div class="header-left" style="display:flex;align-items:center;gap:10px;">
+      ${
+        isDemoMode()
+          ? `<span class="tag tag-accent" style="margin-left:180px;">Interactive Demo Mode · Local Browser Sandbox</span>`
+          : ''
+      }
+    </div>
 
     <div class="header-right">
       <nav class="header-nav" aria-label="Primary">
         <button class="header-nav-link ${state.view === 'forms' || state.view === 'form' ? 'active' : ''}" data-nav="forms">Forms</button>
+        <button class="header-nav-link ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Assistant</button>
         <button class="header-nav-link ${state.view === 'channels' ? 'active' : ''}" data-nav="channels">Notifications</button>
         <button class="header-nav-link ${state.view === 'sandbox' ? 'active' : ''}" data-nav="sandbox">Sandbox</button>
         <button class="header-nav-link ${state.view === 'mail' || state.view === 'webhooks' ? 'active' : ''}" data-nav="mail">Activity</button>
         <button class="header-nav-link ${state.view === 'workspace' || state.view === 'setup' ? 'active' : ''}" data-nav="workspace">Brand</button>
       </nav>
-      <a class="btn btn-primary btn-sm" href="/manage" target="_blank" rel="noopener">
-        Owner Portal
-      </a>
-      <button class="btn btn-ghost btn-sm" style="padding:0 10px;" data-action="logout" title="Sign out">${icons.lock}</button>
+      ${
+        isDemoMode()
+          ? `<a class="btn btn-primary btn-sm" href="/#pricing">Buy License · $149</a>
+             <button class="btn btn-secondary btn-sm" data-action="reset-demo-studio">Reset Demo</button>`
+          : `<a class="btn btn-primary btn-sm" href="/manage" target="_blank" rel="noopener">Owner Portal</a>
+             <button class="btn btn-ghost btn-sm" style="padding:0 10px;" data-action="logout" title="Sign out">${icons.lock}</button>`
+      }
     </div>
   `;
 }
@@ -2303,6 +2322,36 @@ function renderWorkspaceView() {
           </div>
         </div>
 
+        ${
+          !isDemoMode()
+            ? `<div class="card card-padded" style="margin-bottom:22px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+                  <div>
+                    <h2 class="section-title" style="margin:0;">Partner &amp; Admin Key Generator ($0 Cost)</h2>
+                    <div class="cell-secondary">Generate domain-locked client keys for your own sites or partner clients at $0 cost without overwriting this workspace.</div>
+                  </div>
+                  <span class="tag tag-accent">Partner Only</span>
+                </div>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                  <input class="input mono" id="partner-key-domain" placeholder="clientwebsite.com.au" style="flex:1;min-width:200px;" />
+                  <input class="input" id="partner-key-holder" placeholder="Client Business Name" style="flex:1;min-width:200px;" />
+                  <button type="button" class="btn btn-primary btn-sm" data-action="partner-mint-key">Generate Client Key ($0)</button>
+                </div>
+                ${
+                  state.partnerIssuedKey
+                    ? `<div style="margin-top:14px;padding:12px 14px;border-radius:10px;background:var(--accent-soft);border:1px solid var(--border-subtle);">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+                          <strong style="font-size:13px;color:var(--text-primary);">Client Key Minted for ${escapeHtml(state.partnerIssuedKey.domain)}</strong>
+                          <button type="button" class="btn btn-secondary btn-sm" data-copy="${escapeHtml(state.partnerIssuedKey.key)}">Copy Key</button>
+                        </div>
+                        <pre class="mono" style="margin:0;font-size:11.5px;white-space:pre-wrap;word-break:break-all;color:var(--text-primary);">${escapeHtml(state.partnerIssuedKey.key)}</pre>
+                      </div>`
+                    : ''
+                }
+              </div>`
+            : ''
+        }
+
         <form id="workspace-settings-form" style="display:flex;flex-direction:column;gap:22px;">
       <div class="split-grid">
         <div class="card card-padded">
@@ -2817,6 +2866,115 @@ function launchLivePopoutPreview(formId, mode = 'drawer') {
   document.body.appendChild(script);
 }
 
+function renderAssistantView() {
+  const msgs = state.assistantMessages || [];
+  const draft = state.assistantDraftForm;
+  const mcpUrl = `${state.baseUrl}/api/mcp`;
+  const mcpSnippet = JSON.stringify(
+    {
+      mcpServers: {
+        askforms: {
+          url: mcpUrl,
+          headers: { Authorization: 'Bearer YOUR_ASK1_KEY_OR_ADMIN_PASSWORD' },
+        },
+      },
+    },
+    null,
+    2
+  );
+
+  els.content.innerHTML = `
+    <div class="sub-header-bar">
+      <div class="sub-header-inner">
+        <div class="sub-header-left">
+          <h1 class="page-title" style="margin:0;">AI Form &amp; Inbox Assistant</h1>
+          <span class="tag tag-accent">Free Built-In · MCP Ready</span>
+        </div>
+        <div class="sub-header-actions">
+          <button type="button" class="btn btn-secondary btn-sm" data-action="assistant-clear">Clear Chat</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-container view-animate">
+      <div class="split-grid" style="align-items:start;">
+        <div class="card card-padded" style="display:flex;flex-direction:column;gap:14px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-secondary btn-sm" data-assistant-prompt="Create a 2-step roofing quote form asking for suburb, roof type, solar panels, urgency, and phone">Build a Quote Form</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-assistant-prompt="Create a clinic appointment booking form with preferred day, time, and NDIS number">Build a Clinic Booking Form</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-assistant-prompt="Give me live form analytics">Form Analytics</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-assistant-prompt="Show unread enquiries in my inbox">Query Inbox</button>
+          </div>
+
+          <div id="assistant-chat-log" style="display:flex;flex-direction:column;gap:10px;max-height:380px;overflow-y:auto;padding:12px;border-radius:12px;background:var(--bg-subtle);border:1px solid var(--border-subtle);">
+            ${msgs
+              .map(
+                (m) => `
+                <div style="align-self:${m.role === 'user' ? 'flex-end' : 'flex-start'};max-width:88%;padding:10px 14px;border-radius:12px;font-size:13.5px;line-height:1.55;white-space:pre-wrap;background:${m.role === 'user' ? 'var(--accent)' : 'var(--bg-surface)'};color:${m.role === 'user' ? '#ffffff' : 'var(--text-primary)'};border:1px solid var(--border-subtle);">${escapeHtml(m.text)}</div>
+              `
+              )
+              .join('')}
+          </div>
+
+          ${
+            draft
+              ? `<div style="padding:14px;border-radius:12px;background:var(--accent-soft);border:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                  <div>
+                    <strong style="font-size:14px;color:var(--text-primary);">Draft Ready: ${escapeHtml(draft.name)}</strong>
+                    <div class="cell-secondary">${draft.fields.length} fields · ${draft.multi_step ? '2-Step Layout' : 'Single-Step Layout'}</div>
+                  </div>
+                  <button type="button" class="btn btn-primary btn-sm" data-action="assistant-create-draft">Create Form Now</button>
+                </div>`
+              : ''
+          }
+
+          <form id="assistant-chat-form" style="display:flex;gap:8px;">
+            <input class="input" id="assistant-input" name="message" placeholder="Describe a form to build, query your inbox, or ask for analytics..." required style="flex:1;" />
+            <button type="submit" class="btn btn-primary btn-sm">Send</button>
+          </form>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div class="card card-padded">
+            <h2 class="section-title" style="margin-bottom:6px;">Connect Your Own AI (MCP Server)</h2>
+            <p class="cell-secondary" style="margin:0 0 12px;">
+              Connect Claude Desktop, ChatGPT, or Cursor directly to your AskForms MCP endpoint to create forms and summarise enquiries with your existing AI subscription ($0 extra cost).
+            </p>
+            <div class="field-group" style="margin-bottom:10px;">
+              <label class="field-label">MCP Endpoint URL</label>
+              <div style="display:flex;gap:8px;">
+                <input class="input mono" value="${escapeHtml(mcpUrl)}" readonly style="flex:1;font-size:12px;" />
+                <button type="button" class="btn btn-secondary btn-sm" data-copy="${escapeHtml(mcpUrl)}">Copy</button>
+              </div>
+            </div>
+            <pre class="mono" style="margin:0;padding:12px;border-radius:10px;background:#0c262b;color:#4fd1c5;font-size:11.5px;overflow-x:auto;">${escapeHtml(mcpSnippet)}</pre>
+          </div>
+
+          <div class="card card-padded">
+            <h2 class="section-title" style="margin-bottom:6px;">Optional: Bring Your Own AI Key (BYOK)</h2>
+            <p class="cell-secondary" style="margin:0 0 12px;">
+              Not required! The built-in assistant above works free out of the box. Paste a Gemini (free tier) or OpenAI key below only if you want full LLM phrasing.
+            </p>
+            <div class="form-grid-2">
+              <div class="field-group" style="margin:0;">
+                <label class="field-label" for="byok-provider">Provider</label>
+                <select class="select" id="byok-provider">
+                  <option value="gemini" ${state.assistantByok.provider === 'gemini' ? 'selected' : ''}>Google Gemini (Free Tier)</option>
+                  <option value="openai" ${state.assistantByok.provider === 'openai' ? 'selected' : ''}>OpenAI (GPT-4o Mini)</option>
+                </select>
+              </div>
+              <div class="field-group" style="margin:0;">
+                <label class="field-label" for="byok-key">API Key (Browser Session Only)</label>
+                <input class="input mono" id="byok-key" type="password" placeholder="AIza... or sk-..." value="${escapeHtml(state.assistantByok.apiKey || '')}" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderChannelsView() {
   const defs = state.channelsDefs || [];
   const cfg = state.channelsConfig || {};
@@ -2963,6 +3121,7 @@ function render() {
 
   if (state.view === 'forms') renderFormsOverview();
   else if (state.view === 'form') renderFormWorkspace();
+  else if (state.view === 'assistant') renderAssistantView();
   else if (state.view === 'channels') renderChannelsView();
   else if (state.view === 'sandbox') renderSandboxView();
   else if (state.view === 'mail') renderMailOutboxView();
@@ -3010,6 +3169,67 @@ document.addEventListener('click', async (e) => {
     const wrap = document.querySelector('.project-heading-wrap');
     wrap?.classList.remove('open');
     wrap?.querySelector('.heading-switcher')?.setAttribute('aria-expanded', 'false');
+  }
+
+  if (target.closest('[data-action="reset-demo-studio"]')) {
+    try { localStorage.removeItem('askforms_studio_demo_v1'); } catch {}
+    window.location.reload();
+    return;
+  }
+
+  if (target.closest('[data-action="partner-mint-key"]')) {
+    const domain = document.getElementById('partner-key-domain')?.value?.trim() || '';
+    const holder = document.getElementById('partner-key-holder')?.value?.trim() || domain;
+    if (!domain) {
+      showToast('Enter a client domain first');
+      return;
+    }
+    try {
+      const res = await api.issueLicense(domain, holder, false);
+      state.partnerIssuedKey = { domain: res.payload.domain, holder: res.payload.holder, key: res.key };
+      render();
+      showToast(`Client key minted for ${res.payload.domain}`);
+    } catch (err) {
+      showToast(err.message);
+    }
+    return;
+  }
+
+  const quickPromptBtn = target.closest('[data-assistant-prompt]');
+  if (quickPromptBtn) {
+    const prompt = quickPromptBtn.getAttribute('data-assistant-prompt');
+    const inp = document.getElementById('assistant-input');
+    if (inp) inp.value = prompt;
+    document.getElementById('assistant-chat-form')?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    return;
+  }
+
+  if (target.closest('[data-action="assistant-clear"]')) {
+    state.assistantMessages = state.assistantMessages.slice(0, 1);
+    state.assistantDraftForm = null;
+    render();
+    return;
+  }
+
+  if (target.closest('[data-action="assistant-create-draft"]')) {
+    const draft = state.assistantDraftForm;
+    if (!draft) return;
+    try {
+      const { form: created } = await api.createForm({
+        name: draft.name,
+        client_name: draft.client_name,
+        fields: draft.fields,
+        submit_label: draft.submit_label,
+        multi_step: draft.multi_step,
+      });
+      state.assistantDraftForm = null;
+      await refreshBootstrap();
+      await openForm(created.id, 'builder');
+      showToast(`Created "${created.name}"`);
+    } catch (err) {
+      showToast(err.message);
+    }
+    return;
   }
 
   const saveChannelsBtn = target.closest('[data-action="save-channels"]');
@@ -3883,6 +4103,30 @@ document.addEventListener('change', async (e) => {
 // Form submissions
 document.addEventListener('submit', async (e) => {
   const form = e.target;
+
+  if (form.id === 'assistant-chat-form') {
+    e.preventDefault();
+    const inp = document.getElementById('assistant-input');
+    const msg = (inp?.value || '').trim();
+    if (!msg) return;
+    state.assistantByok.provider = document.getElementById('byok-provider')?.value || 'gemini';
+    state.assistantByok.apiKey = document.getElementById('byok-key')?.value?.trim() || '';
+    state.assistantMessages.push({ role: 'user', text: msg });
+    if (inp) inp.value = '';
+    render();
+    try {
+      const res = await api.askAssistant(msg, state.assistantByok);
+      state.assistantMessages.push({ role: 'assistant', text: res.reply || 'Done.' });
+      state.assistantDraftForm = res.draftForm || null;
+      render();
+      const log = document.getElementById('assistant-chat-log');
+      if (log) log.scrollTop = log.scrollHeight;
+    } catch (err) {
+      state.assistantMessages.push({ role: 'assistant', text: 'Error: ' + err.message });
+      render();
+    }
+    return;
+  }
 
   if (form.id === 'login-form') {
     e.preventDefault();
