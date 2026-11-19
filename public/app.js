@@ -1,5 +1,5 @@
-import { api, copyText, escapeHtml, formatRelativeTime, formatTimestamp, isDemoMode } from './api.js';
-import { icons } from './icons.js';
+import { api, copyText, escapeHtml, formatRelativeTime, formatTimestamp, isDemoMode } from './api.js?v=4';
+import { icons } from './icons.js?v=4';
 
 const state = {
   baseUrl: window.location.origin,
