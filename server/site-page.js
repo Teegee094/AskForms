@@ -10,7 +10,6 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'audit-
   const lic = workspace.license || {};
   const envObj = typeof process !== 'undefined' && process.env ? process.env : {};
   const priceAud = workspace.price_aud || envObj.LICENSE_PRICE_AUD || '149';
-  const stripeCheckoutUrl = workspace.stripe_checkout_url || envObj.STRIPE_CHECKOUT_URL || '';
 
   return `<!doctype html>
 <html lang="en">
@@ -142,6 +141,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'audit-
       transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
     }
     .btn:hover { transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
     .btn-mint { background: var(--mint); color: var(--petrol-deep); }
     .btn-mint:hover { background: var(--mint-hover); }
     .btn-ghost-light { background: rgba(255, 255, 255, 0.12); color: #ffffff; border-color: rgba(255, 255, 255, 0.2); }
@@ -277,11 +277,14 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'audit-
             <label class="label" for="lic-holder">Client Business Name</label>
             <input class="input" id="lic-holder" name="holder" placeholder="Harbour Plumbing Co" value="${escapeHtml(lic.holder || '')}" required />
           </div>
-          ${
-            stripeCheckoutUrl
-              ? `<a class="btn btn-petrol" style="width:100%;margin-top:6px;" href="${escapeHtml(stripeCheckoutUrl)}" target="_blank" rel="noopener">Purchase Single-Domain Key &rarr;</a>`
-              : `<button type="submit" class="btn btn-petrol" style="width:100%;margin-top:6px;">Generate &amp; Activate Domain License Key</button>`
-          }
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+            <button type="button" class="btn btn-mint" style="width:100%;" id="stripe-buy-btn">
+              Purchase Single-Domain License ($${escapeHtml(priceAud)} AUD) &rarr;
+            </button>
+            <button type="submit" class="btn btn-secondary" style="width:100%;height:38px;font-size:13px;" id="partner-issue-btn">
+              Partner / Admin: Generate &amp; Activate Key Instantly
+            </button>
+          </div>
         </form>
 
         <div id="issued-result" class="result-box">
@@ -289,7 +292,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'audit-
           <div style="margin-top:4px;color:var(--muted);">Locked exclusively to <span class="mono" id="res-domain"></span></div>
           <pre class="key-pre" id="res-key"></pre>
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-            <a href="/?tab=workspace" style="font-weight:700;color:var(--petrol);text-decoration:underline;">Return to Console &rarr;</a>
+            <a href="/" style="font-weight:700;color:var(--petrol);text-decoration:underline;">Return to Console &rarr;</a>
             <button type="button" class="btn btn-secondary" style="height:32px;padding:0 12px;font-size:12px;" id="copy-key-btn">Copy Key</button>
           </div>
         </div>
@@ -322,11 +325,40 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'audit-
     });
 
     const form = document.getElementById('issue-key-form');
+    const stripeBtn = document.getElementById('stripe-buy-btn');
     const resBox = document.getElementById('issued-result');
     const resDomain = document.getElementById('res-domain');
     const resKey = document.getElementById('res-key');
     let latestKey = '';
 
+    // Live Stripe Checkout Redirect
+    stripeBtn?.addEventListener('click', async () => {
+      if (!form.reportValidity()) return;
+      const fd = new FormData(form);
+      stripeBtn.disabled = true;
+      stripeBtn.textContent = 'Redirecting to Stripe Checkout...';
+      try {
+        const res = await fetch('/api/license/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            domain: fd.get('domain'),
+            holder: fd.get('holder'),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.checkoutUrl) {
+          throw new Error(data.error || 'Unable to start Stripe Checkout');
+        }
+        window.location.href = data.checkoutUrl;
+      } catch (err) {
+        alert(err.message);
+        stripeBtn.disabled = false;
+        stripeBtn.textContent = 'Purchase Single-Domain License ($${escapeHtml(priceAud)} AUD) →';
+      }
+    });
+
+    // Partner / Admin Instant Key Generation
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
@@ -349,6 +381,23 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'audit-
       resKey.textContent = data.key;
       resBox.classList.add('visible');
     });
+
+    // Automatic Post-Stripe Checkout Verification (?session_id=cs_...)
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session_id');
+    if (sessionId) {
+      fetch('/api/license/verify-session?session_id=' + encodeURIComponent(sessionId))
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.key && data.payload) {
+            latestKey = data.key;
+            resDomain.textContent = data.payload.domain;
+            resKey.textContent = data.key;
+            resBox.classList.add('visible');
+          }
+        })
+        .catch(() => {});
+    }
 
     document.getElementById('copy-key-btn')?.addEventListener('click', () => {
       if (latestKey) {

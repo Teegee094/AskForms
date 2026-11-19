@@ -36,7 +36,7 @@ import {
 } from './db.js';
 import { handleIngestOptions, handleIngestPost } from './ingest.js';
 import { renderManagePortalPage, renderManifestJson } from './manage-page.js';
-import { issueLicenseKey, verifyLicenseKey } from './license.js';
+import { issueLicenseKey, normalizeDomain, verifyLicenseKey } from './license.js';
 import { parseMultipart } from './multipart.js';
 import { renderClientDemoPage, renderEmbedPage, renderThanksPage } from './pages.js';
 import { renderCommercialSitePage } from './site-page.js';
@@ -361,6 +361,84 @@ const server = http.createServer(async (req, res) => {
       const notes = body.notes !== undefined ? String(body.notes) : (existing.notes || '');
       db.prepare('UPDATE submissions SET status = ?, notes = ? WHERE id = ?').run(status, notes, subId);
       return sendJson(res, 200, { updated: true, status, notes });
+    }
+
+    // ---------------------------------------------------------
+    // 4D. PUBLIC STRIPE CHECKOUT & LICENSE PURCHASE (/site)
+    // ---------------------------------------------------------
+    if (pathname === '/api/license/checkout' && method === 'POST') {
+      const body = await readJsonBody(req);
+      const cleanDomain = normalizeDomain(body.domain);
+      const holder = String(body.holder || cleanDomain).trim();
+      if (!cleanDomain || !cleanDomain.includes('.')) {
+        return sendJson(res, 400, { error: 'Enter a valid domain (e.g. harbourplumbing.com.au)' });
+      }
+      const stripeKey = process.env.STRIPE_API_KEY || '';
+      if (!stripeKey) {
+        return sendJson(res, 400, { error: 'STRIPE_API_KEY is not configured on this server.' });
+      }
+      const priceAud = Number(process.env.LICENSE_PRICE_AUD || 149);
+      const params = new URLSearchParams({
+        mode: 'payment',
+        'managed_payments[enabled]': 'false',
+        success_url: `${BASE_URL}/site?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${BASE_URL}/site?domain=${encodeURIComponent(cleanDomain)}`,
+        'line_items[0][price_data][currency]': 'aud',
+        'line_items[0][price_data][unit_amount]': String(Math.round(priceAud * 100)),
+        'line_items[0][price_data][product_data][name]': `AskForms — Single-Domain Lifetime License (${cleanDomain})`,
+        'line_items[0][price_data][product_data][description]': `Lifetime single-website license locked to ${cleanDomain} (${holder})`,
+        'line_items[0][quantity]': '1',
+        'metadata[domain]': cleanDomain,
+        'metadata[holder]': holder,
+      });
+
+      const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${stripeKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+      });
+      const session = await stripeRes.json();
+      if (!stripeRes.ok || !session.url) {
+        return sendJson(res, 400, { error: session?.error?.message || 'Unable to create Stripe Checkout session.' });
+      }
+      return sendJson(res, 200, {
+        checkoutUrl: session.url,
+        sessionId: session.id,
+        domain: cleanDomain,
+      });
+    }
+
+    if (pathname === '/api/license/verify-session' && method === 'GET') {
+      const sessionId = (url.searchParams.get('session_id') || '').trim();
+      const stripeKey = process.env.STRIPE_API_KEY || '';
+      if (!sessionId || !stripeKey) {
+        return sendJson(res, 400, { error: 'Missing session_id or Stripe configuration.' });
+      }
+      const stripeRes = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+        headers: { Authorization: `Bearer ${stripeKey}` },
+      });
+      const session = await stripeRes.json();
+      if (!stripeRes.ok) {
+        return sendJson(res, 400, { error: session?.error?.message || 'Unable to verify Stripe session.' });
+      }
+      if (session.payment_status !== 'paid') {
+        return sendJson(res, 402, { paid: false, status: session.payment_status });
+      }
+      const cleanDomain = normalizeDomain(session.metadata?.domain || '');
+      const holder = String(session.metadata?.holder || cleanDomain).trim();
+      const { key, payload } = issueLicenseKey({ domain: cleanDomain, holder });
+      setSetting('license_key', key);
+      setSetting('license_holder', payload.holder);
+      setSetting('website_url', `https://${payload.domain}`);
+      return sendJson(res, 200, {
+        paid: true,
+        key,
+        payload,
+        workspace: getWorkspaceConfig(),
+      });
     }
 
     // Gate all admin API routes when ADMIN_PASSWORD is active

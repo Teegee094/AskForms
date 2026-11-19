@@ -447,6 +447,88 @@ export async function onRequest(context) {
     return jsonResp(200, { removed: true, workspace: await getWorkspace(db) });
   }
 
+  if (pathname === '/api/license/checkout' && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    const cleanDomain = normalizeDomain(body.domain);
+    const holder = String(body.holder || cleanDomain).trim();
+    if (!cleanDomain || !cleanDomain.includes('.')) {
+      return jsonResp(400, { error: 'Enter a valid domain (e.g. harbourplumbing.com.au)' });
+    }
+    const stripeKey = env.STRIPE_API_KEY || '';
+    if (!stripeKey) {
+      return jsonResp(400, { error: 'STRIPE_API_KEY is not configured.' });
+    }
+    const priceAud = Number(env.LICENSE_PRICE_AUD || 149);
+    const params = new URLSearchParams({
+      mode: 'payment',
+      'managed_payments[enabled]': 'false',
+      success_url: `${baseUrl}/site?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/site?domain=${encodeURIComponent(cleanDomain)}`,
+      'line_items[0][price_data][currency]': 'aud',
+      'line_items[0][price_data][unit_amount]': String(Math.round(priceAud * 100)),
+      'line_items[0][price_data][product_data][name]': `AskForms — Single-Domain Lifetime License (${cleanDomain})`,
+      'line_items[0][price_data][product_data][description]': `Lifetime single-website license locked to ${cleanDomain} (${holder})`,
+      'line_items[0][quantity]': '1',
+      'metadata[domain]': cleanDomain,
+      'metadata[holder]': holder,
+    });
+
+    const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${stripeKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+    const session = await stripeRes.json();
+    if (!stripeRes.ok || !session.url) {
+      return jsonResp(400, { error: session?.error?.message || 'Unable to create Stripe Checkout session.' });
+    }
+    return jsonResp(200, {
+      checkoutUrl: session.url,
+      sessionId: session.id,
+      domain: cleanDomain,
+    });
+  }
+
+  if (pathname === '/api/license/verify-session' && method === 'GET') {
+    const sessionId = (url.searchParams.get('session_id') || '').trim();
+    const stripeKey = env.STRIPE_API_KEY || '';
+    if (!sessionId || !stripeKey) {
+      return jsonResp(400, { error: 'Missing session_id or Stripe configuration.' });
+    }
+    const stripeRes = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+      headers: { Authorization: `Bearer ${stripeKey}` },
+    });
+    const session = await stripeRes.json();
+    if (!stripeRes.ok) {
+      return jsonResp(400, { error: session?.error?.message || 'Unable to verify Stripe session.' });
+    }
+    if (session.payment_status !== 'paid') {
+      return jsonResp(402, { paid: false, status: session.payment_status });
+    }
+    const cleanDomain = normalizeDomain(session.metadata?.domain || '');
+    const holder = String(session.metadata?.holder || cleanDomain).trim();
+    const payload = {
+      id: `lic_${crypto.randomUUID().slice(0, 10)}`,
+      domain: cleanDomain,
+      holder,
+      plan: 'lifetime-single-site',
+      issued_at: new Date().toISOString().slice(0, 10),
+    };
+    const key = `ASK1.${toB64Url(JSON.stringify(payload))}.${toB64Url(crypto.randomUUID())}`;
+    await setSetting(db, 'license_key', key);
+    await setSetting(db, 'license_holder', payload.holder);
+    await setSetting(db, 'website_url', `https://${payload.domain}`);
+    return jsonResp(200, {
+      paid: true,
+      key,
+      payload,
+      workspace: await getWorkspace(db),
+    });
+  }
+
   if (pathname === '/api/forms' && method === 'GET') {
     return jsonResp(200, { forms: await listFormsWithCounts(db) });
   }

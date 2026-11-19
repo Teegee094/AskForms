@@ -13,5 +13,6 @@ data/uploads/*
 
 # Dependencies & OS
 node_modules/
+.wrangler/
 .DS_Store
 Thumbs.db
