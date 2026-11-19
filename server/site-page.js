@@ -8,8 +8,9 @@ function escapeHtml(str) {
 
 export function renderCommercialSitePage(workspace = {}, defaultFormId = 'audit-intake', baseUrl = '') {
   const lic = workspace.license || {};
-  const priceAud = process.env.LICENSE_PRICE_AUD || '149';
-  const stripeCheckoutUrl = process.env.STRIPE_CHECKOUT_URL || '';
+  const envObj = typeof process !== 'undefined' && process.env ? process.env : {};
+  const priceAud = workspace.price_aud || envObj.LICENSE_PRICE_AUD || '149';
+  const stripeCheckoutUrl = workspace.stripe_checkout_url || envObj.STRIPE_CHECKOUT_URL || '';
 
   return `<!doctype html>
 <html lang="en">
