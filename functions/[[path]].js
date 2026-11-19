@@ -258,8 +258,15 @@ export async function onRequest(context) {
     return htmlResp(200, renderCommercialSitePage(await getWorkspace(db), first?.id || 'audit-intake', baseUrl));
   }
 
+  if (pathname === '/app' && method === 'GET' && url.searchParams.get('demo') !== '1' && !(request.headers.get('Cookie') || '').includes('askforms_auth_v2=')) {
+    return Response.redirect(`${baseUrl}/partner`, 302);
+  }
+
   if ((pathname === '/app' || pathname === '/partner' || pathname === '/setup') && method === 'GET') {
-    return env.ASSETS.fetch(new URL('/app.html', request.url));
+    const assetRes = await env.ASSETS.fetch(new URL('/app.html', request.url));
+    const headers = new Headers(assetRes.headers);
+    headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    return new Response(assetRes.body, { status: assetRes.status, headers });
   }
 
   if (pathname === '/manifest.json' && method === 'GET') {

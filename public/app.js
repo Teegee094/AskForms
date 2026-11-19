@@ -4138,8 +4138,10 @@ document.addEventListener('submit', async (e) => {
   if (form.id === 'login-form') {
     e.preventDefault();
     const fd = new FormData(form);
+    const domainVal = String(document.getElementById('login-domain')?.value || fd.get('domain') || '').trim();
+    const keyVal = String(document.getElementById('login-password')?.value || fd.get('password') || '').trim();
     try {
-      await api.login(fd.get('password'), fd.get('domain'));
+      await api.login(keyVal, domainVal);
       state.authenticated = true;
       await refreshBootstrap();
       render();
