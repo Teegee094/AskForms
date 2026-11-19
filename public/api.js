@@ -399,6 +399,13 @@ export const api = {
     }
     return request('/api/assistant', { method: 'POST', body: JSON.stringify({ message, byok }) });
   },
+  listPartnerClients: () => request('/api/partner/clients'),
+  createPartnerClient: (domain, holder) =>
+    request('/api/partner/clients', { method: 'POST', body: JSON.stringify({ domain, holder }) }),
+  impersonateClient: (domain, holder) =>
+    request('/api/partner/impersonate', { method: 'POST', body: JSON.stringify({ domain, holder }) }),
+  exitImpersonation: () =>
+    request('/api/partner/exit-impersonation', { method: 'POST' }),
 };
 
 export function escapeHtml(value) {

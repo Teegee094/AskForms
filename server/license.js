@@ -56,14 +56,15 @@ export function verifyLicenseKey(keyString) {
     return { valid: false, reason: 'No license key configured.' };
   }
   const parts = raw.split('.');
-  if (parts.length !== 3 || parts[0] !== 'ASK1') {
-    return { valid: false, reason: 'Invalid key format (expected ASK1.<payload>.<signature>).' };
+  const prefix = parts[0];
+  if (parts.length !== 3 || (prefix !== 'ASK1' && prefix !== 'ASKP1')) {
+    return { valid: false, reason: 'Invalid key format (expected ASK1 or ASKP1 key).' };
   }
   const [, payloadB64, sigB64] = parts;
   try {
     const isVerified = crypto.verify(
       null,
-      Buffer.from(`ASK1.${payloadB64}`, 'utf8'),
+      Buffer.from(`${prefix}.${payloadB64}`, 'utf8'),
       ASKFORMS_PUBLIC_KEY_PEM,
       Buffer.from(sigB64, 'base64url')
     );
@@ -77,10 +78,11 @@ export function verifyLicenseKey(keyString) {
     }
     return {
       valid: true,
+      keyType: prefix === 'ASKP1' ? 'partner' : 'client',
       licenseId: payload.id || 'ask-lic',
       domain,
       holder: payload.holder || domain,
-      plan: payload.plan || 'lifetime-single-site',
+      plan: payload.plan || (prefix === 'ASKP1' ? 'partner-reseller' : 'lifetime-single-site'),
       issuedAt: payload.issued_at || null,
     };
   } catch (err) {
@@ -92,7 +94,7 @@ export function verifyLicenseKey(keyString) {
  * Issue a signed `ASK1.<payload>.<sig>` key for a single domain using the private key.
  * Only available when `.keys/askforms-private.pem` or `ASKFORMS_MASTER_PRIVATE_KEY` is present.
  */
-export function issueLicenseKey({ domain, holder = '', plan = 'lifetime-single-site' }) {
+export function issueLicenseKey({ domain, holder = '', plan = 'lifetime-single-site', type = 'client' }) {
   const cleanDomain = normalizeDomain(domain);
   if (!cleanDomain || !cleanDomain.includes('.')) {
     throw new Error('Please enter a valid website domain (e.g. harbourplumbing.com.au).');
@@ -109,20 +111,24 @@ export function issueLicenseKey({ domain, holder = '', plan = 'lifetime-single-s
     throw new Error('Master private signing key not available on this instance.');
   }
 
+  const isPartner = type === 'partner' || plan === 'partner-reseller';
+  const prefix = isPartner ? 'ASKP1' : 'ASK1';
+
   const payload = {
-    id: `lic_${crypto.randomBytes(5).toString('hex')}`,
+    id: `${isPartner ? 'prt' : 'lic'}_${crypto.randomBytes(5).toString('hex')}`,
     domain: cleanDomain,
     holder: String(holder || cleanDomain).trim(),
-    plan,
+    plan: isPartner ? 'partner-reseller' : plan,
+    role: isPartner ? 'partner' : 'client',
     issued_at: new Date().toISOString().slice(0, 10),
   };
 
   const payloadB64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
-  const signature = crypto.sign(null, Buffer.from(`ASK1.${payloadB64}`, 'utf8'), privateKeyPem);
+  const signature = crypto.sign(null, Buffer.from(`${prefix}.${payloadB64}`, 'utf8'), privateKeyPem);
   const sigB64 = signature.toString('base64url');
 
   return {
-    key: `ASK1.${payloadB64}.${sigB64}`,
+    key: `${prefix}.${payloadB64}.${sigB64}`,
     payload,
   };
 }

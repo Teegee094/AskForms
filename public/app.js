@@ -1,4 +1,4 @@
-import { api, copyText, escapeHtml, formatRelativeTime, formatTimestamp, isDemoMode } from './api.js?v=4';
+import { api, copyText, escapeHtml, formatRelativeTime, formatTimestamp, isDemoMode } from './api.js?v=5';
 import { icons } from './icons.js?v=4';
 
 const state = {
@@ -92,7 +92,16 @@ const state = {
   assistantDraftForm: null,
   assistantByok: { provider: 'gemini', apiKey: '' },
   partnerIssuedKey: null,
+  partnerClients: [],
 };
+
+function isPartnerSession() {
+  return !isDemoMode() && state.workspace?.session_role === 'partner';
+}
+
+function getImpersonatedBy() {
+  return !isDemoMode() ? (state.workspace?.impersonated_by || null) : null;
+}
 
 const els = {
   app: document.getElementById('app'),
@@ -205,12 +214,25 @@ async function refreshBootstrap() {
   if (!state.sandboxFormId && state.forms.length > 0) {
     state.sandboxFormId = state.forms[0].id;
   }
+  if (isPartnerSession()) {
+    try {
+      const res = await api.listPartnerClients();
+      state.partnerClients = res.clients || [];
+    } catch {
+      state.partnerClients = [];
+    }
+  } else {
+    state.partnerClients = [];
+  }
 }
 
-async function openForm(formId, tab = 'submissions') {
+async function openForm(formId, tab = null) {
   state.view = 'form';
   state.selectedFormId = formId;
-  state.formTab = tab;
+  state.formTab = tab || (isPartnerSession() ? 'builder' : 'submissions');
+  if (isPartnerSession() && state.formTab === 'submissions') {
+    state.formTab = 'builder';
+  }
   state.subQuery = '';
   state.selectedSubmission = null;
   closeDrawer();
@@ -269,11 +291,30 @@ async function switchView(view) {
 // ============================================================
 function renderTopbar() {
   const ws = state.workspace || {};
+  const partner = isPartnerSession();
+  const impersonatedBy = getImpersonatedBy();
 
   if (els.brandLockup) {
     els.brandLockup.innerHTML = ws.logo_url
       ? `<img class="brand-logo-img" src="${escapeHtml(ws.logo_url)}" alt="${escapeHtml(ws.brand_name || 'AskForms')}" />`
       : `${icons.brand}<span class="brand-name">${escapeHtml(ws.brand_name || 'AskForms')}</span>`;
+  }
+
+  if (partner) {
+    els.topbar.innerHTML = `
+      <div class="header-left" aria-hidden="true"></div>
+
+      <div class="header-right">
+        <nav class="header-nav" aria-label="Partner Primary">
+          <button class="header-nav-link ${state.view === 'partner-clients' ? 'active' : ''}" data-nav="partner-clients">Clients &amp; Keys</button>
+          <button class="header-nav-link ${state.view === 'forms' || state.view === 'form' ? 'active' : ''}" data-nav="forms">Client Forms</button>
+          <button class="header-nav-link ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Form Builder</button>
+        </nav>
+        <span class="tag tag-accent" style="white-space:nowrap;">Partner · ${escapeHtml(ws.license_holder || ws.brand_name || 'Agency')}</span>
+        <button class="btn btn-ghost btn-sm" style="padding:0 10px;" data-action="logout" title="Sign out">${icons.lock}</button>
+      </div>
+    `;
+    return;
   }
 
   els.topbar.innerHTML = `
@@ -291,6 +332,9 @@ function renderTopbar() {
       ${
         isDemoMode()
           ? `<a class="btn btn-primary btn-sm" href="/#pricing">Buy License · $149</a>`
+          : impersonatedBy
+          ? `<button type="button" class="btn btn-secondary btn-sm" data-action="exit-impersonation" style="white-space:nowrap;">← Partner Portal</button>
+             <a class="btn btn-primary btn-sm" href="/manage" target="_blank" rel="noopener">Owner Inbox</a>`
           : `<a class="btn btn-primary btn-sm" href="/manage" target="_blank" rel="noopener">Owner Inbox</a>
              <button class="btn btn-ghost btn-sm" style="padding:0 10px;" data-action="logout" title="Sign out">${icons.lock}</button>`
       }
@@ -299,6 +343,7 @@ function renderTopbar() {
 }
 
 function renderSidebar() {
+  const partner = isPartnerSession();
   const showArchived = state.formsStatusFilter === 'archived';
   const unarchivedForms = state.forms.filter((f) => Boolean(f.is_archived) === showArchived);
   const visibleForms =
@@ -307,6 +352,12 @@ function renderSidebar() {
       : unarchivedForms.filter((f) => f.client_name === state.clientFilter);
 
   const groups = new Map();
+  if (partner && !showArchived) {
+    for (const c of state.partnerClients || []) {
+      const label = c.holder || c.domain;
+      if (label && !groups.has(label)) groups.set(label, []);
+    }
+  }
   for (const f of visibleForms) {
     const key = f.client_name || 'Default Project';
     if (!groups.has(key)) groups.set(key, []);
@@ -336,21 +387,25 @@ function renderSidebar() {
                 </span>
               </button>
               <ul class="project-forms">
-                ${items
-                  .map(
-                    (f) => `
-                    <li>
-                      <button class="tree-form-btn ${state.view === 'form' && state.selectedFormId === f.id ? 'active' : ''}" data-open-form="${escapeHtml(f.id)}">
-                        <span class="tree-form-left">
-                          <span class="form-dot ${f.is_active && !f.is_archived ? '' : 'paused'}"></span>
-                          <span class="tree-form-name">${escapeHtml(f.name)}</span>
-                        </span>
-                        <span class="tree-count">${f.submission_count}</span>
-                      </button>
-                    </li>
-                  `
-                  )
-                  .join('')}
+                ${
+                  items.length === 0
+                    ? `<li><button class="tree-form-btn" data-new-form-for="${escapeHtml(projectName)}" style="color:var(--ink-muted);font-style:italic;"><span class="tree-form-left">+ Add first form</span></button></li>`
+                    : items
+                        .map(
+                          (f) => `
+                          <li>
+                            <button class="tree-form-btn ${state.view === 'form' && state.selectedFormId === f.id ? 'active' : ''}" data-open-form="${escapeHtml(f.id)}">
+                              <span class="tree-form-left">
+                                <span class="form-dot ${f.is_active && !f.is_archived ? '' : 'paused'}"></span>
+                                <span class="tree-form-name">${escapeHtml(f.name)}</span>
+                              </span>
+                              ${partner ? '' : `<span class="tree-count">${f.submission_count}</span>`}
+                            </button>
+                          </li>
+                        `
+                        )
+                        .join('')
+                }
               </ul>
             </div>
           `;
@@ -362,28 +417,42 @@ function renderSidebar() {
     <div class="sidebar-inner">
       <div class="sidebar-brand-top" aria-hidden="true"></div>
       <div class="sidebar-cta-wrap">
-        <button class="sidebar-add-primary" data-action="open-create-modal">
-          ${icons.plus} Add New
+        <button class="sidebar-add-primary" data-action="${partner ? 'go-partner-clients' : 'open-create-modal'}">
+          ${icons.plus} ${partner ? 'New Client / Key' : 'Add New'}
         </button>
       </div>
 
       <div class="sidebar-mobile-nav">
-        <button class="tree-form-btn ${state.view === 'forms' ? 'active' : ''}" data-nav="forms">Forms</button>
-        <button class="tree-form-btn ${state.view === 'sandbox' ? 'active' : ''}" data-nav="sandbox">Sandbox</button>
-        <button class="tree-form-btn ${state.view === 'mail' || state.view === 'webhooks' ? 'active' : ''}" data-nav="mail">Activity (Mail & Webhooks)</button>
-        <button class="tree-form-btn ${state.view === 'workspace' || state.view === 'setup' ? 'active' : ''}" data-nav="workspace">Brand & Setup</button>
+        ${
+          partner
+            ? `<button class="tree-form-btn ${state.view === 'partner-clients' ? 'active' : ''}" data-nav="partner-clients">Clients &amp; Keys</button>
+               <button class="tree-form-btn ${state.view === 'forms' ? 'active' : ''}" data-nav="forms">Client Forms</button>
+               <button class="tree-form-btn ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Form Builder</button>`
+            : `<button class="tree-form-btn ${state.view === 'forms' ? 'active' : ''}" data-nav="forms">Forms</button>
+               <button class="tree-form-btn ${state.view === 'sandbox' ? 'active' : ''}" data-nav="sandbox">Sandbox</button>
+               <button class="tree-form-btn ${state.view === 'mail' || state.view === 'webhooks' ? 'active' : ''}" data-nav="mail">Activity (Mail &amp; Webhooks)</button>
+               <button class="tree-form-btn ${state.view === 'workspace' || state.view === 'setup' ? 'active' : ''}" data-nav="workspace">Brand &amp; Setup</button>`
+        }
       </div>
 
       <div class="sidebar-tree">
         ${groupHtml}
       </div>
 
-      <div class="sidebar-footer">
-        <div class="sidebar-footer-links">
-          <button class="sidebar-text-link" data-nav="setup">${icons.wizard} Setup Wizard</button>
-          <button class="sidebar-text-link" data-action="open-deploy-modal">${icons.deploy} Deploy</button>
-        </div>
-      </div>
+      ${
+        partner
+          ? `<div class="sidebar-footer">
+               <div class="sidebar-footer-links">
+                 <button class="sidebar-text-link" data-action="open-create-modal">${icons.plus} New Form</button>
+               </div>
+             </div>`
+          : `<div class="sidebar-footer">
+               <div class="sidebar-footer-links">
+                 <button class="sidebar-text-link" data-nav="setup">${icons.wizard} Setup Wizard</button>
+                 <button class="sidebar-text-link" data-action="open-deploy-modal">${icons.deploy} Deploy</button>
+               </div>
+             </div>`
+      }
     </div>
   `;
 }
@@ -577,9 +646,13 @@ function renderFormWorkspace() {
   const f = state.currentForm;
   if (!f) return;
   const endpoint = `${state.baseUrl}/f/${f.id}`;
+  const partner = isPartnerSession();
+  if (partner && state.formTab === 'submissions') {
+    state.formTab = 'builder';
+  }
 
   let bodyHtml = '';
-  if (state.formTab === 'submissions') bodyHtml = renderFormSubmissionsTab(f);
+  if (state.formTab === 'submissions' && !partner) bodyHtml = renderFormSubmissionsTab(f);
   else if (state.formTab === 'builder') bodyHtml = renderFormBuilderTab(f);
   else if (state.formTab === 'integration') bodyHtml = renderFormIntegrationTab(f);
   else if (state.formTab === 'workflows') bodyHtml = renderFormWorkflowsTab(f);
@@ -606,9 +679,13 @@ function renderFormWorkspace() {
         </div>
 
         <div class="underline-tabs" role="tablist">
-          <button class="underline-tab ${state.formTab === 'submissions' ? 'active' : ''}" data-form-tab="submissions">
-            Enquiries <span class="tab-count">${f.submission_count}</span>
-          </button>
+          ${
+            partner
+              ? ''
+              : `<button class="underline-tab ${state.formTab === 'submissions' ? 'active' : ''}" data-form-tab="submissions">
+                   Enquiries <span class="tab-count">${f.submission_count}</span>
+                 </button>`
+          }
           <button class="underline-tab ${state.formTab === 'builder' ? 'active' : ''}" data-form-tab="builder">
             Form Builder
           </button>
@@ -2097,7 +2174,7 @@ function renderDrawer() {
 // ============================================================
 // CREATE FORM MODAL
 // ============================================================
-function openCreateModal() {
+function openCreateModal(defaultClientName = '') {
   els.modal.classList.remove('hidden');
   els.modalBackdrop.classList.remove('hidden');
 
@@ -2115,7 +2192,7 @@ function openCreateModal() {
       <div class="form-grid-2">
         <div class="field-group">
           <label class="field-label" for="new-client">Client / Project</label>
-          <input class="input" id="new-client" name="client_name" placeholder="Sintiro / Centella / Client Name" />
+          <input class="input" id="new-client" name="client_name" value="${escapeHtml(defaultClientName)}" placeholder="Client Business Name" />
         </div>
         <div class="field-group">
           <label class="field-label" for="new-id">Custom endpoint slug</label>
@@ -3086,6 +3163,123 @@ function renderLoginScreen(errorMessage = '') {
   `;
 }
 
+function renderPartnerClientsView() {
+  const ws = state.workspace || {};
+  const clients = state.partnerClients || [];
+  const issued = state.partnerIssuedKey;
+
+  const clientCardsHtml =
+    clients.length === 0
+      ? `<div class="card card-padded" style="text-align:center;padding:40px 24px;">
+           <div style="font-size:15px;font-weight:700;color:var(--ink-primary);margin-bottom:6px;">No client accounts yet</div>
+           <div class="cell-secondary">Create your first client account above to mint a free ASK1 client key and starter form.</div>
+         </div>`
+      : `<div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(340px, 1fr));gap:16px;">
+          ${clients
+            .map((c) => {
+              const clientForms = state.forms.filter(
+                (f) => !f.is_archived && String(f.client_name || '').toLowerCase() === String(c.holder || c.domain).toLowerCase()
+              );
+              const formCount = clientForms.length || c.form_count || 0;
+              return `
+                <article class="card card-padded" style="display:flex;flex-direction:column;justify-content:space-between;gap:14px;">
+                  <div>
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+                      <div>
+                        <div style="font-size:16px;font-weight:700;color:var(--ink-primary);">${escapeHtml(c.holder || c.domain)}</div>
+                        <div class="mono" style="font-size:12.5px;color:var(--ink-muted);margin-top:2px;">${escapeHtml(c.domain)}</div>
+                      </div>
+                      <span class="tag tag-accent" style="white-space:nowrap;">${formCount} ${formCount === 1 ? 'Form' : 'Forms'}</span>
+                    </div>
+
+                    ${
+                      c.license_key
+                        ? `<div style="margin-top:12px;padding:9px 11px;border-radius:10px;background:var(--bg-canvas);border:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                             <code class="mono" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-secondary);">${escapeHtml(c.license_key)}</code>
+                             <button type="button" class="btn btn-ghost btn-sm" style="flex-shrink:0;" data-copy="${escapeHtml(c.license_key)}">${icons.copy} Copy Key</button>
+                           </div>`
+                        : ''
+                    }
+                  </div>
+
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:12px;border-top:1px solid var(--border-subtle);">
+                    <button type="button" class="btn btn-secondary btn-sm" data-new-form-for="${escapeHtml(c.holder || c.domain)}" style="white-space:nowrap;">
+                      ${icons.plus} New Form
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" data-impersonate-domain="${escapeHtml(c.domain)}" data-impersonate-holder="${escapeHtml(c.holder || c.domain)}" style="white-space:nowrap;">
+                      Login as Client →
+                    </button>
+                  </div>
+                </article>
+              `;
+            })
+            .join('')}
+        </div>`;
+
+  els.content.innerHTML = `
+    <div class="page-band">
+      <div class="page-band-inner">
+        <div class="page-band-top">
+          <div>
+            <h1 class="page-band-title">Partner Clients &amp; Keys</h1>
+            <p class="cell-secondary" style="margin:4px 0 0;">Mint client license keys at $0 cost, generate live forms for their websites, or log in as any client to manage their deployment.</p>
+          </div>
+          <div class="toolbar-group">
+            <button type="button" class="btn btn-secondary" data-action="open-create-modal">${icons.plus} New Form</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-inner">
+      <div class="content-container view-animate" style="display:flex;flex-direction:column;gap:22px;">
+        <section class="card card-padded">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+            <div>
+              <h2 class="section-title" style="margin:0;">Create Client Account &amp; Mint Key ($0)</h2>
+              <p class="cell-secondary" style="margin:3px 0 0;">Creates a client account, mints an official ASK1 single-site license key, and provisions a starter form.</p>
+            </div>
+            <span class="tag tag-accent">Reseller Partner · ${escapeHtml(ws.license_holder || 'Agency')}</span>
+          </div>
+
+          <form id="partner-create-client-form" class="form-grid-3" style="align-items:end;gap:12px;">
+            <div class="field-group" style="margin:0;">
+              <label class="field-label" for="partner-client-holder">Client Business Name</label>
+              <input class="input" id="partner-client-holder" name="holder" placeholder="Harbour Plumbing Co" required />
+            </div>
+            <div class="field-group" style="margin:0;">
+              <label class="field-label" for="partner-client-domain">Client Website Domain</label>
+              <input class="input mono" id="partner-client-domain" name="domain" placeholder="harbourplumbing.com.au" required />
+            </div>
+            <div>
+              <button type="submit" class="btn btn-primary" style="width:100%;white-space:nowrap;">Create Account &amp; Mint Key</button>
+            </div>
+          </form>
+
+          ${
+            issued
+              ? `<div style="margin-top:16px;padding:14px 16px;border-radius:12px;background:var(--bg-canvas);border:1px solid var(--border-subtle);">
+                   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+                     <strong style="font-size:13.5px;">Client key ready for ${escapeHtml(issued.holder)} (${escapeHtml(issued.domain)})</strong>
+                     <button type="button" class="btn btn-primary btn-sm" data-copy="${escapeHtml(issued.key)}">${icons.copy} Copy ASK1 Key</button>
+                   </div>
+                   <code class="mono" style="display:block;font-size:11.5px;word-break:break-all;color:var(--ink-secondary);">${escapeHtml(issued.key)}</code>
+                 </div>`
+              : ''
+          }
+        </section>
+
+        <section>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h2 class="section-title" style="margin:0;">Client Accounts (${clients.length})</h2>
+          </div>
+          ${clientCardsHtml}
+        </section>
+      </div>
+    </div>
+  `;
+}
+
 // ============================================================
 // MASTER RENDER
 // ============================================================
@@ -3113,7 +3307,8 @@ function render() {
   renderTopbar();
   renderSidebar();
 
-  if (state.view === 'forms') renderFormsOverview();
+  if (state.view === 'partner-clients') renderPartnerClientsView();
+  else if (state.view === 'forms') renderFormsOverview();
   else if (state.view === 'form') renderFormWorkspace();
   else if (state.view === 'assistant') renderAssistantView();
   else if (state.view === 'channels') renderChannelsView();
@@ -3181,6 +3376,52 @@ document.addEventListener('click', async (e) => {
   if (target.closest('[data-action="reset-demo-studio"]')) {
     try { localStorage.removeItem('askforms_studio_demo_v1'); } catch {}
     window.location.reload();
+    return;
+  }
+
+  if (target.closest('[data-action="go-partner-clients"]')) {
+    els.app.classList.remove('sidebar-open');
+    await switchView('partner-clients');
+    document.getElementById('partner-client-holder')?.focus();
+    return;
+  }
+
+  const newFormForBtn = target.closest('[data-new-form-for]');
+  if (newFormForBtn) {
+    openCreateModal(newFormForBtn.dataset.newFormFor || '');
+    return;
+  }
+
+  const impersonateBtn = target.closest('[data-impersonate-domain]');
+  if (impersonateBtn) {
+    const domain = impersonateBtn.dataset.impersonateDomain;
+    const holder = impersonateBtn.dataset.impersonateHolder || domain;
+    try {
+      await api.impersonateClient(domain, holder);
+      state.selectedFormId = null;
+      state.clientFilter = 'all';
+      await refreshBootstrap();
+      state.view = 'forms';
+      render();
+      showToast(`Signed in as ${holder}`);
+    } catch (err) {
+      showToast(err.message);
+    }
+    return;
+  }
+
+  if (target.closest('[data-action="exit-impersonation"]')) {
+    try {
+      await api.exitImpersonation();
+      state.selectedFormId = null;
+      state.clientFilter = 'all';
+      await refreshBootstrap();
+      state.view = 'partner-clients';
+      render();
+      showToast('Returned to Partner Portal');
+    } catch (err) {
+      showToast(err.message);
+    }
     return;
   }
 
@@ -3300,7 +3541,7 @@ document.addEventListener('click', async (e) => {
 
   if (target.closest('[data-action="go-forms"]')) {
     els.app.classList.remove('sidebar-open');
-    await switchView('forms');
+    await switchView(isPartnerSession() ? 'partner-clients' : 'forms');
     return;
   }
 
@@ -4135,6 +4376,31 @@ document.addEventListener('submit', async (e) => {
     return;
   }
 
+  if (form.id === 'partner-create-client-form') {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const holder = String(fd.get('holder') || '').trim();
+    const domain = String(fd.get('domain') || '').trim();
+    if (!domain) {
+      showToast('Enter a client website domain');
+      return;
+    }
+    try {
+      const res = await api.createPartnerClient(domain, holder || domain);
+      state.partnerIssuedKey = {
+        domain: res.client?.domain || domain,
+        holder: res.client?.holder || holder || domain,
+        key: res.key || res.client?.license_key || '',
+      };
+      await refreshBootstrap();
+      render();
+      showToast(`Created account & minted key for ${state.partnerIssuedKey.holder}`);
+    } catch (err) {
+      showToast(err.message);
+    }
+    return;
+  }
+
   if (form.id === 'login-form') {
     e.preventDefault();
     const fd = new FormData(form);
@@ -4144,6 +4410,7 @@ document.addEventListener('submit', async (e) => {
       await api.login(keyVal, domainVal);
       state.authenticated = true;
       await refreshBootstrap();
+      state.view = isPartnerSession() ? 'partner-clients' : 'forms';
       render();
     } catch (err) {
       renderLoginScreen(err.message);
@@ -4434,6 +4701,9 @@ async function init() {
   } else if (requestedForm && state.forms.some((f) => f.id === requestedForm)) {
     await openForm(requestedForm);
   } else {
+    if (isPartnerSession()) {
+      state.view = 'partner-clients';
+    }
     render();
   }
 }

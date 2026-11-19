@@ -65,18 +65,20 @@ function toB64Url(str) {
 
 function parseKeyPayload(rawKey) {
   const raw = String(rawKey || '').trim();
-  if (!raw.startsWith('ASK1.')) return null;
   const parts = raw.split('.');
-  if (parts.length !== 3) return null;
+  const prefix = parts[0];
+  if (parts.length !== 3 || (prefix !== 'ASK1' && prefix !== 'ASKP1')) return null;
   try {
     const payload = parseB64UrlJson(parts[1]);
     if (!payload.domain) return null;
+    const isPartner = prefix === 'ASKP1' || payload.role === 'partner' || payload.plan === 'partner-reseller';
     return {
       valid: true,
+      keyType: isPartner ? 'partner' : 'client',
       licenseId: payload.id || 'ask-lic',
       domain: normalizeDomain(payload.domain),
       holder: payload.holder || payload.domain,
-      plan: payload.plan || 'lifetime-single-site',
+      plan: payload.plan || (isPartner ? 'partner-reseller' : 'lifetime-single-site'),
       issuedAt: payload.issued_at || null,
     };
   } catch {
@@ -419,6 +421,7 @@ export async function onRequest(context) {
         website_url: `https://${edgeSession.domain}`,
         auth_enabled: true,
         session_role: 'client',
+        impersonated_by: edgeSession.impersonatedBy || null,
         license: {
           ...base.license,
           isLicensed: true,
@@ -429,9 +432,12 @@ export async function onRequest(context) {
     }
     return {
       ...base,
-      brand_name: 'AskForms',
+      brand_name: edgeSession.holder || 'AskForms',
+      license_holder: edgeSession.holder || 'AskForms Partner',
+      website_url: `https://${edgeSession.domain}`,
       auth_enabled: true,
       session_role: 'partner',
+      impersonated_by: null,
     };
   }
 
@@ -451,7 +457,7 @@ export async function onRequest(context) {
     const adminPass = String(env.ADMIN_PASSWORD || 'askforms2026').trim();
 
     let nextSession = null;
-    if (candidate.startsWith('ASK1.')) {
+    if (candidate.startsWith('ASK1.') || candidate.startsWith('ASKP1.')) {
       const verifiedKey = parseKeyPayload(candidate);
       if (!verifiedKey) {
         return jsonResp(401, { error: 'Invalid license key.' });
@@ -463,7 +469,7 @@ export async function onRequest(context) {
         return jsonResp(401, { error: 'Domain does not match this license key.' });
       }
       nextSession = {
-        role: 'client',
+        role: verifiedKey.keyType === 'partner' ? 'partner' : 'client',
         domain: verifiedKey.domain,
         holder: verifiedKey.holder,
       };
@@ -531,9 +537,11 @@ export async function onRequest(context) {
     }
     const priceAud = Number(env.LICENSE_PRICE_AUD || 149);
     const partnerSetupAud = Number(env.PARTNER_SETUP_PRICE_AUD || 99);
+    const partnerLicenseAud = Number(env.PARTNER_LICENSE_PRICE_AUD || 799);
     const partnerName = env.PARTNER_NAME || 'TeaGee Labs';
     const includePartnerSetup = Boolean(body.includePartnerSetup);
     const isSetupOnly = body.plan === 'partner-setup-only';
+    const isPartnerLicense = body.plan === 'partner-license';
 
     const params = new URLSearchParams({
       mode: 'payment',
@@ -544,10 +552,16 @@ export async function onRequest(context) {
       'metadata[holder]': holder,
       'metadata[partner_name]': partnerName,
       'metadata[include_partner_setup]': includePartnerSetup || isSetupOnly ? 'true' : 'false',
-      'metadata[plan]': isSetupOnly ? 'partner-setup-only' : includePartnerSetup ? 'license-and-setup' : 'license',
+      'metadata[plan]': isPartnerLicense ? 'partner-license' : isSetupOnly ? 'partner-setup-only' : includePartnerSetup ? 'license-and-setup' : 'license',
     });
 
-    if (isSetupOnly) {
+    if (isPartnerLicense) {
+      params.set('line_items[0][price_data][currency]', 'aud');
+      params.set('line_items[0][price_data][unit_amount]', String(Math.round(partnerLicenseAud * 100)));
+      params.set('line_items[0][price_data][product_data][name]', `AskForms Partner Reseller License (${cleanDomain})`);
+      params.set('line_items[0][price_data][product_data][description]', `Unlimited client domain keys, dedicated Partner Portal, and client management for ${holder}`);
+      params.set('line_items[0][quantity]', '1');
+    } else if (isSetupOnly) {
       params.set('line_items[0][price_data][currency]', 'aud');
       params.set('line_items[0][price_data][unit_amount]', String(Math.round(partnerSetupAud * 100)));
       params.set('line_items[0][price_data][product_data][name]', `${partnerName} Partner Setup & Hosting (${cleanDomain})`);
@@ -608,14 +622,16 @@ export async function onRequest(context) {
     const partnerName = String(session.metadata?.partner_name || env.PARTNER_NAME || 'TeaGee Labs').trim();
     const includePartnerSetup = session.metadata?.include_partner_setup === 'true';
     const customerEmail = session.customer_details?.email || '';
+    const isPartnerReseller = session.metadata?.plan === 'partner-license';
     const payload = {
-      id: `lic_${crypto.randomUUID().slice(0, 10)}`,
+      id: `${isPartnerReseller ? 'prt' : 'lic'}_${crypto.randomUUID().slice(0, 10)}`,
       domain: cleanDomain,
       holder,
-      plan: 'lifetime-single-site',
+      plan: isPartnerReseller ? 'partner-reseller' : 'lifetime-single-site',
+      role: isPartnerReseller ? 'partner' : 'client',
       issued_at: new Date().toISOString().slice(0, 10),
     };
-    const key = `ASK1.${toB64Url(JSON.stringify(payload))}.${toB64Url(crypto.randomUUID())}`;
+    const key = `${isPartnerReseller ? 'ASKP1' : 'ASK1'}.${toB64Url(JSON.stringify(payload))}.${toB64Url(crypto.randomUUID())}`;
 
     // Deliver license key exclusively via email (never returned in public JSON)
     const resendRow = await db.prepare("SELECT value FROM app_settings WHERE key = 'resend_api_key'").first();
@@ -715,6 +731,117 @@ export async function onRequest(context) {
   // Gate all remaining /api/* admin routes behind authentication
   if (pathname.startsWith('/api/') && !isEdgeAuthed) {
     return jsonResp(401, { error: 'Authentication required.', authRequired: true });
+  }
+
+  // Partner-Only Client Account & Impersonation Routes
+  async function loadPartnerClients() {
+    const row = await db.prepare("SELECT value FROM app_settings WHERE key = 'partner_clients_json'").first();
+    try {
+      const parsed = JSON.parse(row?.value || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  if (pathname === '/api/partner/clients' && method === 'GET') {
+    if (edgeSession?.role !== 'partner') {
+      return jsonResp(403, { error: 'Partner license required.' });
+    }
+    const clients = await loadPartnerClients();
+    const allForms = await listFormsWithCounts(db);
+    const enriched = clients.map((c) => {
+      const cForms = allForms.filter(
+        (f) =>
+          String(f.client_name || '').toLowerCase() === String(c.holder || '').toLowerCase() ||
+          String(f.allowed_origins || '').toLowerCase().includes(normalizeDomain(c.domain))
+      );
+      return { ...c, form_count: cForms.length, forms: cForms };
+    });
+    return jsonResp(200, { clients: enriched });
+  }
+
+  if (pathname === '/api/partner/clients' && method === 'POST') {
+    if (edgeSession?.role !== 'partner') {
+      return jsonResp(403, { error: 'Partner license required.' });
+    }
+    const body = await request.json().catch(() => ({}));
+    const cleanDomain = normalizeDomain(body.domain);
+    const holder = String(body.holder || cleanDomain).trim();
+    if (!cleanDomain || !cleanDomain.includes('.')) {
+      return jsonResp(400, { error: 'Enter a valid client domain (e.g. harbourplumbing.com.au)' });
+    }
+    const payload = {
+      id: `lic_${crypto.randomUUID().slice(0, 10)}`,
+      domain: cleanDomain,
+      holder,
+      plan: 'lifetime-single-site',
+      role: 'client',
+      issued_at: new Date().toISOString().slice(0, 10),
+    };
+    const key = `ASK1.${toB64Url(JSON.stringify(payload))}.${toB64Url(crypto.randomUUID())}`;
+    const clients = await loadPartnerClients();
+    const record = {
+      id: payload.id,
+      domain: cleanDomain,
+      holder,
+      key,
+      partnerDomain: edgeSession.domain,
+      created_at: new Date().toISOString(),
+    };
+    const nextClients = [record, ...clients.filter((c) => c.domain !== cleanDomain)];
+    await setSetting(db, 'partner_clients_json', JSON.stringify(nextClients));
+
+    // Create starter form for this client so it appears immediately in the left pane
+    const formSlug = `${cleanDomain.split('.')[0].replace(/[^a-z0-9]+/g, '-')}-enquiry`;
+    await db
+      .prepare(
+        `INSERT OR IGNORE INTO forms (id, name, client_name, theme_preset, email_recipients, allowed_origins, fields_json, submit_label, multi_step)
+         VALUES (?, ?, ?, 'teagee', '', ?, ?, 'Send Enquiry', 0)`
+      )
+      .bind(formSlug, 'Website Enquiry', holder, `https://${cleanDomain},https://www.${cleanDomain}`, JSON.stringify(DEFAULT_FIELDS))
+      .run();
+
+    return jsonResp(201, { client: record, clients: nextClients });
+  }
+
+  if (pathname === '/api/partner/impersonate' && method === 'POST') {
+    if (edgeSession?.role !== 'partner') {
+      return jsonResp(403, { error: 'Partner license required.' });
+    }
+    const body = await request.json().catch(() => ({}));
+    const cleanDomain = normalizeDomain(body.domain);
+    const holder = String(body.holder || cleanDomain).trim();
+    if (!cleanDomain) return jsonResp(400, { error: 'Missing client domain.' });
+    const nextSession = {
+      role: 'client',
+      domain: cleanDomain,
+      holder,
+      impersonatedBy: { domain: edgeSession.domain, holder: edgeSession.holder },
+    };
+    const encoded = toB64Url(JSON.stringify(nextSession));
+    return jsonResp(
+      200,
+      { ok: true, session: nextSession },
+      { 'Set-Cookie': `askforms_auth_v2=${encodeURIComponent(encoded)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800` }
+    );
+  }
+
+  if (pathname === '/api/partner/exit-impersonation' && method === 'POST') {
+    if (!edgeSession?.impersonatedBy) {
+      return jsonResp(400, { error: 'Not currently viewing as a client.' });
+    }
+    const nextSession = {
+      role: 'partner',
+      domain: edgeSession.impersonatedBy.domain,
+      holder: edgeSession.impersonatedBy.holder,
+    };
+    const encoded = toB64Url(JSON.stringify(nextSession));
+    return jsonResp(
+      200,
+      { ok: true, session: nextSession },
+      { 'Set-Cookie': `askforms_auth_v2=${encodeURIComponent(encoded)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800` }
+    );
   }
 
   if (pathname === '/api/channels' && method === 'GET') {

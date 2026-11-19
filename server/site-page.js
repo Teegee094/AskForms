@@ -12,6 +12,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
   const envObj = typeof process !== 'undefined' && process.env ? process.env : {};
   const priceAud = workspace.price_aud || envObj.LICENSE_PRICE_AUD || '149';
   const partnerSetupAud = workspace.partner_setup_aud || envObj.PARTNER_SETUP_PRICE_AUD || '99';
+  const partnerLicenseAud = workspace.partner_license_aud || envObj.PARTNER_LICENSE_PRICE_AUD || '799';
   const partnerName = workspace.partner_name || envObj.PARTNER_NAME || 'TeaGee Labs';
   const templates = Object.values(SHOWCASE_TEMPLATES);
 
@@ -1819,27 +1820,37 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
             </div>
           </article>
 
-          <!-- Tier 3: Done-For-You Partner Setup & Hosting -->
-          <article class="offer-card reveal" style="transition-delay:160ms;">
+          <!-- Tier 3: Agency & Partner Reseller License -->
+          <article class="offer-card reveal" style="transition-delay:160ms;" id="partner-reseller-card">
             <div>
-              <span class="offer-pill">Partner: ${escapeHtml(partnerName)}</span>
-              <h3 class="offer-title">Partner Setup &amp; Hosting</h3>
+              <span class="offer-pill">Agencies &amp; Resellers</span>
+              <h3 class="offer-title">Partner Reseller License</h3>
               <div class="offer-price-row">
-                <span class="offer-price">+$${escapeHtml(partnerSetupAud)}</span>
-                <span class="offer-price-note">AUD once-off setup fee</span>
+                <span class="offer-price">$${escapeHtml(partnerLicenseAud)}</span>
+                <span class="offer-price-note">AUD once-off · unlimited clients</span>
               </div>
               <p style="font-size:14px;color:var(--ink-secondary);margin:0 0 18px;">
-                Want everything handled for you? ${escapeHtml(partnerName)} sets up your forms, hosts your workspace, and connects your website buttons.
+                Built for web agencies and studios. Mint unlimited client license keys at $0 cost, build client forms, and charge your own rates.
               </p>
               <ul class="offer-features">
-                <li><span>✓</span><span>Zero technical setup or code required</span></li>
-                <li><span>✓</span><span>Managed hosting included with zero monthly fees</span></li>
-                <li><span>✓</span><span>Custom forms, Owner Portal PIN, and mobile alerts configured</span></li>
+                <li><span>✓</span><span>Dedicated Partner Portal to create client accounts &amp; keys</span></li>
+                <li><span>✓</span><span>Zero per-client fees; resell at your own agency pricing</span></li>
+                <li><span>✓</span><span>1-click Login as Client to manage deployments</span></li>
               </ul>
             </div>
-            <button type="button" class="btn-tpl-secondary" style="width:100%;height:44px;" data-scroll-checkout="partner">
-              Add Partner Setup
-            </button>
+            <form id="partner-license-form" style="display:flex;flex-direction:column;gap:10px;">
+              <div>
+                <label class="checkout-label" for="partner-lic-domain" style="color:var(--ink-secondary);">Agency Domain</label>
+                <input class="checkout-input mono" id="partner-lic-domain" name="domain" placeholder="youragency.com.au" required style="background:var(--canvas);color:var(--ink);border-color:var(--border);" />
+              </div>
+              <div>
+                <label class="checkout-label" for="partner-lic-holder" style="color:var(--ink-secondary);">Agency Name</label>
+                <input class="checkout-input" id="partner-lic-holder" name="holder" placeholder="Your Agency Studio" required style="background:var(--canvas);color:var(--ink);border-color:var(--border);" />
+              </div>
+              <button type="submit" class="btn-tpl-primary" id="partner-buy-btn" style="width:100%;height:44px;margin-top:4px;white-space:nowrap;">
+                Become a Partner · $${escapeHtml(partnerLicenseAud)} AUD
+              </button>
+            </form>
           </article>
         </div>
       </div>
@@ -2453,6 +2464,40 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
       }
     });
 
+    const partnerForm = document.getElementById('partner-license-form');
+    const partnerBuyBtn = document.getElementById('partner-buy-btn');
+    partnerForm?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!partnerForm.reportValidity()) return;
+      const fd = new FormData(partnerForm);
+      if (partnerBuyBtn) {
+        partnerBuyBtn.disabled = true;
+        partnerBuyBtn.textContent = 'Opening Stripe...';
+      }
+      try {
+        const res = await fetch('/api/license/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            domain: fd.get('domain'),
+            holder: fd.get('holder'),
+            plan: 'partner-license',
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.checkoutUrl) {
+          throw new Error(data.error || 'Unable to start Stripe Checkout');
+        }
+        window.location.href = data.checkoutUrl;
+      } catch (err) {
+        alert(err.message);
+        if (partnerBuyBtn) {
+          partnerBuyBtn.disabled = false;
+          partnerBuyBtn.textContent = 'Become a Partner · $${escapeHtml(partnerLicenseAud)} AUD';
+        }
+      }
+    });
+
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get('session_id');
     if (sessionId) {
@@ -2464,9 +2509,14 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
             latestHolder = data.holder || data.domain;
             const targetEmail = data.customerEmail || 'your checkout email address';
             if (resSummary) {
-              resSummary.innerHTML = 'Your lifetime license key and setup instructions for <strong class="mono">' + esc(data.domain) + '</strong> have been sent to <strong>' + esc(targetEmail) + '</strong>.';
+              resSummary.innerHTML =
+                data.plan === 'partner-license'
+                  ? 'Your Partner Reseller key and portal instructions for <strong class="mono">' + esc(data.domain) + '</strong> have been sent to <strong>' + esc(targetEmail) + '</strong>.'
+                  : 'Your lifetime license key and setup instructions for <strong class="mono">' + esc(data.domain) + '</strong> have been sent to <strong>' + esc(targetEmail) + '</strong>.';
             }
-            if (data.includePartnerSetup) {
+            if (data.plan === 'partner-license') {
+              resNextSteps.innerHTML = 'Sign in anytime at <a href="/partner" style="color:var(--petrol);font-weight:600;">/partner</a> with your agency domain and ASKP1 partner key. Unable to access your email? Use the support form below.';
+            } else if (data.includePartnerSetup) {
               resNextSteps.innerHTML = '<strong>' + esc(data.partnerName || 'TeaGee Labs') + ' Setup Included:</strong> Our partner team has been notified and will reach out to set up and host your forms. Unable to access your email? Use the support form below.';
             } else {
               resNextSteps.innerHTML = 'For security, license keys are sent directly to your email only. Unable to access your email? Reach out via our support form below.';
