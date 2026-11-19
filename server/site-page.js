@@ -234,7 +234,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'audit-
       <span>AskForms</span>
     </a>
     <div class="btn-row">
-      <a class="btn btn-secondary" style="height:40px;padding:0 18px;font-size:13.5px;" href="/">Designer Console</a>
+      <a class="btn btn-secondary" style="height:40px;padding:0 18px;font-size:13.5px;" href="/app">Workspace Sign In</a>
       <a class="btn btn-petrol" style="height:40px;padding:0 18px;font-size:13.5px;" href="/manage">Owner Portal</a>
     </div>
   </header>
@@ -251,11 +251,9 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'audit-
           <button type="button" class="btn btn-mint" id="try-drawer-btn">Try Slide-Over Drawer Live</button>
           <button type="button" class="btn btn-ghost-light" id="try-chat-btn">Try Floating Chat Window</button>
         </div>
-        <div style="margin-top:22px;font-size:13px;color:rgba(230,255,250,0.72);">
-          Currently on this workspace:
-          <strong style="color:#ffffff;">
-            ${lic.isLicensed ? `Licensed to ${escapeHtml(lic.licensedDomain)}` : `Live Preview Mode (${lic.previewRemaining ?? 5} test enquiries left)`}
-          </strong>
+        <div style="margin-top:22px;padding:12px 14px;border-radius:12px;background:rgba(14,42,47,0.48);border:1px solid rgba(79,209,197,0.22);font-size:12.5px;color:rgba(230,255,250,0.88);">
+          <div style="font-weight:700;color:var(--mint);margin-bottom:4px;">Test Live on Any Website (5-Enquiry Preview Mode):</div>
+          <code class="mono" style="font-size:11.5px;color:#ffffff;word-break:break-all;">&lt;script src="https://askforms.app/widget.js" data-form="${escapeHtml(defaultFormId)}" data-mode="drawer" defer&gt;&lt;/script&gt;</code>
         </div>
       </div>
 
@@ -270,30 +268,30 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'audit-
 
         <form id="issue-key-form">
           <div class="field">
-            <label class="label" for="lic-domain">Client Website Domain (locked to this site)</label>
-            <input class="input mono" id="lic-domain" name="domain" placeholder="harbourplumbing.com.au" value="${escapeHtml(lic.licensedDomain || workspace.website_url || '')}" required />
+            <label class="label" for="lic-domain">Website Domain to License</label>
+            <input class="input mono" id="lic-domain" name="domain" placeholder="harbourplumbing.com.au" value="" required />
           </div>
           <div class="field">
-            <label class="label" for="lic-holder">Client Business Name</label>
-            <input class="input" id="lic-holder" name="holder" placeholder="Harbour Plumbing Co" value="${escapeHtml(lic.holder || '')}" required />
+            <label class="label" for="lic-holder">Business / Client Name</label>
+            <input class="input" id="lic-holder" name="holder" placeholder="Harbour Plumbing Co" value="" required />
           </div>
-          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
-            <button type="button" class="btn btn-mint" style="width:100%;" id="stripe-buy-btn">
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">
+            <button type="submit" class="btn btn-mint" style="width:100%;" id="stripe-buy-btn">
               Purchase Single-Domain License ($${escapeHtml(priceAud)} AUD) &rarr;
             </button>
-            <button type="submit" class="btn btn-secondary" style="width:100%;height:38px;font-size:13px;" id="partner-issue-btn">
-              Partner / Admin: Generate &amp; Activate Key Instantly
-            </button>
+            <div style="text-align:center;font-size:12.5px;color:var(--muted);">
+              Have a license key or partner login? <a href="/app" style="color:var(--petrol);font-weight:700;text-decoration:underline;">Sign in to Workspace &rarr;</a>
+            </div>
           </div>
         </form>
 
         <div id="issued-result" class="result-box">
-          <strong>Domain License Activated!</strong>
+          <strong>Payment Verified — Single-Domain Key Issued!</strong>
           <div style="margin-top:4px;color:var(--muted);">Locked exclusively to <span class="mono" id="res-domain"></span></div>
           <pre class="key-pre" id="res-key"></pre>
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-            <a href="/" style="font-weight:700;color:var(--petrol);text-decoration:underline;">Return to Console &rarr;</a>
-            <button type="button" class="btn btn-secondary" style="height:32px;padding:0 12px;font-size:12px;" id="copy-key-btn">Copy Key</button>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;">
+            <a href="/app" class="btn btn-petrol" style="height:34px;padding:0 14px;font-size:12.5px;">Sign In to Workspace Console &rarr;</a>
+            <button type="button" class="btn btn-secondary" style="height:34px;padding:0 12px;font-size:12px;" id="copy-key-btn">Copy Key</button>
           </div>
         </div>
       </div>
@@ -301,16 +299,16 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'audit-
 
     <section class="grid-3">
       <div class="card">
-        <h3>1. Test Live on Their Site First</h3>
-        <p>Connect the pop-out drawer to any client staging or live website during your pitch. Includes 5 live test enquiries in Preview Mode before requiring activation.</p>
+        <h3>1. Test Live on Your Site First</h3>
+        <p>Drop the 1-line pop-out script onto your live or staging website to test the slide-over drawer. Includes 5 live test enquiries in Preview Mode before activation.</p>
       </div>
       <div class="card">
-        <h3>2. Cryptographic 1-Domain Lock</h3>
-        <p>Each Ed25519-signed <span class="mono">ASK1</span> license key is mathematically bound to a single client domain (<span class="mono">client.com.au</span>) and cannot be reused on other sites.</p>
+        <h3>2. Purchase Your 1-Domain Key</h3>
+        <p>Checkout once via Stripe ($${escapeHtml(priceAud)} AUD, no subscription). You receive an Ed25519-signed <span class="mono">ASK1</span> license key cryptographically bound to your domain.</p>
       </div>
       <div class="card">
-        <h3>3. Zero Monthly Fees Forever</h3>
-        <p>Runs on Cloudflare Pages &amp; D1 Free Tier (100,000 requests/day) or any Node 22 host with a mobile 6-digit PIN Owner Portal at <span class="mono">/manage</span>.</p>
+        <h3>3. Unlock Workspace &amp; Owner Portal</h3>
+        <p>Use your <span class="mono">ASK1</span> key to sign in at <a href="/app" class="mono" style="text-decoration:underline;font-weight:600;">/app</a> to customize fields &amp; branding, and use the 6-digit PIN portal at <a href="/manage" class="mono" style="text-decoration:underline;font-weight:600;">/manage</a> for daily mobile replies.</p>
       </div>
     </section>
   </main>
@@ -332,7 +330,8 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'audit-
     let latestKey = '';
 
     // Live Stripe Checkout Redirect
-    stripeBtn?.addEventListener('click', async () => {
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
       if (!form.reportValidity()) return;
       const fd = new FormData(form);
       stripeBtn.disabled = true;
@@ -356,30 +355,6 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'audit-
         stripeBtn.disabled = false;
         stripeBtn.textContent = 'Purchase Single-Domain License ($${escapeHtml(priceAud)} AUD) →';
       }
-    });
-
-    // Partner / Admin Instant Key Generation
-    form?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const fd = new FormData(form);
-      const res = await fetch('/api/license/issue', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          domain: fd.get('domain'),
-          holder: fd.get('holder'),
-          activate: true,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error || 'Could not issue key');
-        return;
-      }
-      latestKey = data.key;
-      resDomain.textContent = data.payload.domain;
-      resKey.textContent = data.key;
-      resBox.classList.add('visible');
     });
 
     // Automatic Post-Stripe Checkout Verification (?session_id=cs_...)

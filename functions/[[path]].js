@@ -250,9 +250,13 @@ export async function onRequest(context) {
     return htmlResp(200, renderManagePortalPage(await getWorkspace(db)));
   }
 
-  if (pathname === '/site' && method === 'GET') {
+  if ((pathname === '/' || pathname === '/site') && method === 'GET') {
     const first = await db.prepare('SELECT id FROM forms ORDER BY created_at ASC LIMIT 1').first();
     return htmlResp(200, renderCommercialSitePage(await getWorkspace(db), first?.id || 'audit-intake', baseUrl));
+  }
+
+  if ((pathname === '/app' || pathname === '/setup') && method === 'GET') {
+    return env.ASSETS.fetch(new URL('/app.html', request.url));
   }
 
   if (pathname === '/manifest.json' && method === 'GET') {
@@ -361,8 +365,46 @@ export async function onRequest(context) {
   }
 
   // REST API Routes (/api/*)
+  const cookieHeader = request.headers.get('Cookie') || '';
+  const isEdgeAuthed = /(?:^|;\s*)formflow_session=authenticated_v1(?:;|$)/.test(cookieHeader);
+
   if (pathname === '/api/auth/status' && method === 'GET') {
-    return jsonResp(200, { authEnabled: false, authenticated: true, workspace: await getWorkspace(db) });
+    const ws = await getWorkspace(db);
+    return jsonResp(200, {
+      authEnabled: true,
+      authenticated: isEdgeAuthed,
+      workspace: { ...ws, auth_enabled: true },
+    });
+  }
+
+  if (pathname === '/api/auth/login' && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    const candidate = String(body.password || '').trim();
+    const adminPass = String(env.ADMIN_PASSWORD || 'askforms2026').trim();
+    const verifiedKey = candidate.startsWith('ASK1.') ? parseKeyPayload(candidate) : null;
+
+    if (verifiedKey) {
+      await setSetting(db, 'license_key', candidate);
+      await setSetting(db, 'license_holder', verifiedKey.holder);
+      await setSetting(db, 'website_url', `https://${verifiedKey.domain}`);
+    }
+
+    if (verifiedKey || (candidate && candidate === adminPass)) {
+      return jsonResp(
+        200,
+        { ok: true },
+        { 'Set-Cookie': 'formflow_session=authenticated_v1; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800' }
+      );
+    }
+    return jsonResp(401, { error: 'Enter a valid ASK1 license key or partner administrator password.' });
+  }
+
+  if (pathname === '/api/auth/logout' && method === 'POST') {
+    return jsonResp(
+      200,
+      { ok: true },
+      { 'Set-Cookie': 'formflow_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' }
+    );
   }
 
   if (pathname === '/api/manage/status' && method === 'GET') {
@@ -389,64 +431,6 @@ export async function onRequest(context) {
     return jsonResp(200, { updated: true });
   }
 
-  if (pathname === '/api/bootstrap' && method === 'GET') {
-    return jsonResp(200, {
-      baseUrl,
-      stats: await getStats(db),
-      forms: await listFormsWithCounts(db),
-      workspace: await getWorkspace(db),
-    });
-  }
-
-  if (pathname === '/api/workspace' && method === 'GET') {
-    return jsonResp(200, { workspace: await getWorkspace(db) });
-  }
-
-  if (pathname === '/api/workspace' && method === 'PATCH') {
-    const body = await request.json().catch(() => ({}));
-    for (const k of ['brand_name', 'website_url', 'support_email', 'license_holder', 'logo_url', 'accent_color', 'accent_text_color', 'bg_color', 'font_preset', 'radius_preset', 'thanks_heading', 'thanks_body', 'email_footer', 'email_provider', 'mail_from', 'resend_api_key']) {
-      if (body[k] !== undefined) await setSetting(db, k, body[k]);
-    }
-    return jsonResp(200, { workspace: await getWorkspace(db) });
-  }
-
-  if (pathname === '/api/license/activate' && method === 'POST') {
-    const body = await request.json().catch(() => ({}));
-    const verified = parseKeyPayload(body.license_key);
-    if (!verified) return jsonResp(400, { error: 'Invalid ASK1 license key.' });
-    await setSetting(db, 'license_key', String(body.license_key).trim());
-    await setSetting(db, 'license_holder', verified.holder);
-    await setSetting(db, 'website_url', `https://${verified.domain}`);
-    return jsonResp(200, { activated: true, verified, workspace: await getWorkspace(db) });
-  }
-
-  if (pathname === '/api/license/issue' && method === 'POST') {
-    const body = await request.json().catch(() => ({}));
-    const cleanDomain = normalizeDomain(body.domain);
-    if (!cleanDomain || !cleanDomain.includes('.')) {
-      return jsonResp(400, { error: 'Enter a valid domain (e.g. harbourplumbing.com.au)' });
-    }
-    const payload = {
-      id: `lic_${crypto.randomUUID().slice(0, 10)}`,
-      domain: cleanDomain,
-      holder: String(body.holder || cleanDomain).trim(),
-      plan: 'lifetime-single-site',
-      issued_at: new Date().toISOString().slice(0, 10),
-    };
-    const key = `ASK1.${toB64Url(JSON.stringify(payload))}.${toB64Url(crypto.randomUUID())}`;
-    if (body.activate !== false) {
-      await setSetting(db, 'license_key', key);
-      await setSetting(db, 'license_holder', payload.holder);
-      await setSetting(db, 'website_url', `https://${payload.domain}`);
-    }
-    return jsonResp(200, { key, payload, workspace: await getWorkspace(db) });
-  }
-
-  if (pathname === '/api/license/remove' && method === 'POST') {
-    await db.prepare("DELETE FROM app_settings WHERE key = 'license_key'").run();
-    return jsonResp(200, { removed: true, workspace: await getWorkspace(db) });
-  }
-
   if (pathname === '/api/license/checkout' && method === 'POST') {
     const body = await request.json().catch(() => ({}));
     const cleanDomain = normalizeDomain(body.domain);
@@ -462,8 +446,8 @@ export async function onRequest(context) {
     const params = new URLSearchParams({
       mode: 'payment',
       'managed_payments[enabled]': 'false',
-      success_url: `${baseUrl}/site?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/site?domain=${encodeURIComponent(cleanDomain)}`,
+      success_url: `${baseUrl}/?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/?domain=${encodeURIComponent(cleanDomain)}`,
       'line_items[0][price_data][currency]': 'aud',
       'line_items[0][price_data][unit_amount]': String(Math.round(priceAud * 100)),
       'line_items[0][price_data][product_data][name]': `AskForms — Single-Domain Lifetime License (${cleanDomain})`,
@@ -527,6 +511,69 @@ export async function onRequest(context) {
       payload,
       workspace: await getWorkspace(db),
     });
+  }
+
+  // Gate all remaining /api/* admin routes behind authentication
+  if (pathname.startsWith('/api/') && !isEdgeAuthed) {
+    return jsonResp(401, { error: 'Authentication required.', authRequired: true });
+  }
+
+  if (pathname === '/api/bootstrap' && method === 'GET') {
+    return jsonResp(200, {
+      baseUrl,
+      stats: await getStats(db),
+      forms: await listFormsWithCounts(db),
+      workspace: await getWorkspace(db),
+    });
+  }
+
+  if (pathname === '/api/workspace' && method === 'GET') {
+    return jsonResp(200, { workspace: await getWorkspace(db) });
+  }
+
+  if (pathname === '/api/workspace' && method === 'PATCH') {
+    const body = await request.json().catch(() => ({}));
+    for (const k of ['brand_name', 'website_url', 'support_email', 'license_holder', 'logo_url', 'accent_color', 'accent_text_color', 'bg_color', 'font_preset', 'radius_preset', 'thanks_heading', 'thanks_body', 'email_footer', 'email_provider', 'mail_from', 'resend_api_key']) {
+      if (body[k] !== undefined) await setSetting(db, k, body[k]);
+    }
+    return jsonResp(200, { workspace: await getWorkspace(db) });
+  }
+
+  if (pathname === '/api/license/activate' && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    const verified = parseKeyPayload(body.license_key);
+    if (!verified) return jsonResp(400, { error: 'Invalid ASK1 license key.' });
+    await setSetting(db, 'license_key', String(body.license_key).trim());
+    await setSetting(db, 'license_holder', verified.holder);
+    await setSetting(db, 'website_url', `https://${verified.domain}`);
+    return jsonResp(200, { activated: true, verified, workspace: await getWorkspace(db) });
+  }
+
+  if (pathname === '/api/license/issue' && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    const cleanDomain = normalizeDomain(body.domain);
+    if (!cleanDomain || !cleanDomain.includes('.')) {
+      return jsonResp(400, { error: 'Enter a valid domain (e.g. harbourplumbing.com.au)' });
+    }
+    const payload = {
+      id: `lic_${crypto.randomUUID().slice(0, 10)}`,
+      domain: cleanDomain,
+      holder: String(body.holder || cleanDomain).trim(),
+      plan: 'lifetime-single-site',
+      issued_at: new Date().toISOString().slice(0, 10),
+    };
+    const key = `ASK1.${toB64Url(JSON.stringify(payload))}.${toB64Url(crypto.randomUUID())}`;
+    if (body.activate !== false) {
+      await setSetting(db, 'license_key', key);
+      await setSetting(db, 'license_holder', payload.holder);
+      await setSetting(db, 'website_url', `https://${payload.domain}`);
+    }
+    return jsonResp(200, { key, payload, workspace: await getWorkspace(db) });
+  }
+
+  if (pathname === '/api/license/remove' && method === 'POST') {
+    await db.prepare("DELETE FROM app_settings WHERE key = 'license_key'").run();
+    return jsonResp(200, { removed: true, workspace: await getWorkspace(db) });
   }
 
   if (pathname === '/api/forms' && method === 'GET') {

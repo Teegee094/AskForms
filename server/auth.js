@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { getSetting, setSetting } from './db.js';
+import { verifyLicenseKey } from './license.js';
 
 const COOKIE_NAME = 'formflow_session';
 const OWNER_COOKIE_NAME = 'formflow_owner_session';
@@ -32,21 +33,36 @@ export function verifyPassword(plain, stored) {
 }
 
 export function isAuthEnabled() {
-  return Boolean((process.env.ADMIN_PASSWORD || '').trim() || getSetting('admin_password_hash'));
+  return true;
 }
 
 export function verifyAdminPassword(candidate) {
-  const envPass = (process.env.ADMIN_PASSWORD || '').trim();
-  if (envPass) {
-    const a = Buffer.from(String(candidate || ''));
-    const b = Buffer.from(envPass);
-    if (a.length === b.length && crypto.timingSafeEqual(a, b)) return true;
+  const input = String(candidate || '').trim();
+  if (!input) return false;
+
+  // 1. Accept any valid cryptographically signed ASK1 single-domain license key
+  if (input.startsWith('ASK1.')) {
+    const verified = verifyLicenseKey(input);
+    if (verified.valid) {
+      setSetting('license_key', input);
+      setSetting('license_holder', verified.holder);
+      setSetting('website_url', `https://${verified.domain}`);
+      return true;
+    }
+    return false;
   }
+
+  // 2. Accept stored custom admin password hash
   const storedHash = getSetting('admin_password_hash');
-  if (storedHash) {
-    return verifyPassword(candidate || '', storedHash);
+  if (storedHash && verifyPassword(input, storedHash)) {
+    return true;
   }
-  return false;
+
+  // 3. Accept ADMIN_PASSWORD env or default partner password
+  const envPass = (process.env.ADMIN_PASSWORD || 'askforms2026').trim();
+  const a = Buffer.from(input);
+  const b = Buffer.from(envPass);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 export function createSessionToken() {

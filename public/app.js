@@ -274,11 +274,7 @@ function renderTopbar() {
       <a class="btn btn-primary btn-sm" href="/manage" target="_blank" rel="noopener">
         Owner Portal
       </a>
-      ${
-        ws.auth_enabled
-          ? `<button class="btn btn-ghost btn-sm" style="padding:0 10px;" data-action="logout" title="Sign out">${icons.lock}</button>`
-          : ''
-      }
+      <button class="btn btn-ghost btn-sm" style="padding:0 10px;" data-action="logout" title="Sign out">${icons.lock}</button>
     </div>
   `;
 }
@@ -2833,17 +2829,21 @@ function renderLoginScreen(errorMessage = '') {
               : `<span class="brand-mark">${icons.brand}</span><span class="brand-name">${escapeHtml(ws.brand_name || 'AskForms')}</span>`
           }
         </div>
-        <h1 class="page-title" style="font-size:24px;margin-bottom:20px;">Sign in</h1>
+        <h1 class="page-title" style="font-size:24px;margin-bottom:8px;">Workspace Sign In</h1>
+        <p style="margin:0 0 20px;font-size:13.5px;color:var(--text-secondary);">Enter your purchased <code class="cell-mono">ASK1</code> license key or partner administrator password to unlock your workspace.</p>
         ${
           errorMessage
             ? `<div class="card" style="padding:10px 12px;margin-bottom:16px;background:var(--danger-soft);border-color:#f0cbc8;color:var(--danger);font-size:13px;">${escapeHtml(errorMessage)}</div>`
             : ''
         }
         <div class="field-group">
-          <label class="field-label" for="login-password">Administrator password</label>
-          <input class="input" id="login-password" name="password" type="password" required autofocus autocomplete="current-password" />
+          <label class="field-label" for="login-password">License Key (ASK1...) or Admin Password</label>
+          <input class="input" id="login-password" name="password" type="password" placeholder="ASK1.eyJ... or password" required autofocus autocomplete="current-password" />
         </div>
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:4px;">Unlock dashboard</button>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:4px;">Unlock Workspace</button>
+        <div style="margin-top:16px;text-align:center;font-size:12.5px;color:var(--text-secondary);">
+          Need a site license? <a href="/" style="color:var(--text-primary);font-weight:700;text-decoration:underline;">Purchase on askforms.app &rarr;</a>
+        </div>
       </form>
     </div>
   `;

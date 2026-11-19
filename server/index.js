@@ -162,7 +162,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (pathname === '/site' && method === 'GET') {
+    if ((pathname === '/' || pathname === '/site') && method === 'GET') {
       const firstForm = db.prepare('SELECT id FROM forms ORDER BY created_at ASC LIMIT 1').get();
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(renderCommercialSitePage(getWorkspaceConfig(), firstForm?.id || 'audit-intake', BASE_URL));
@@ -381,8 +381,8 @@ const server = http.createServer(async (req, res) => {
       const params = new URLSearchParams({
         mode: 'payment',
         'managed_payments[enabled]': 'false',
-        success_url: `${BASE_URL}/site?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${BASE_URL}/site?domain=${encodeURIComponent(cleanDomain)}`,
+        success_url: `${BASE_URL}/?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${BASE_URL}/?domain=${encodeURIComponent(cleanDomain)}`,
         'line_items[0][price_data][currency]': 'aud',
         'line_items[0][price_data][unit_amount]': String(Math.round(priceAud * 100)),
         'line_items[0][price_data][product_data][name]': `AskForms — Single-Domain Lifetime License (${cleanDomain})`,
@@ -982,15 +982,15 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---------------------------------------------------------
-    // 6. STATIC FRONTEND FILES (SPA)
+    // 6. STATIC FRONTEND FILES (SPA at /app and /setup)
     // ---------------------------------------------------------
     if (method === 'GET') {
-      const safePath = path.normalize(pathname === '/' ? '/index.html' : pathname).replace(/^(\.\.[/\\])+/, '');
+      const safePath = path.normalize(pathname === '/app' || pathname === '/setup' ? '/app.html' : pathname).replace(/^(\.\.[/\\])+/, '');
       const candidate = path.join(PUBLIC_DIR, safePath);
       if (candidate.startsWith(PUBLIC_DIR) && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
         return serveFile(res, candidate);
       }
-      return serveFile(res, path.join(PUBLIC_DIR, 'index.html'));
+      return serveFile(res, path.join(PUBLIC_DIR, 'app.html'));
     }
 
     sendJson(res, 404, { error: 'Route not found.' });
