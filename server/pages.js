@@ -282,6 +282,20 @@ function renderDynamicFieldInputs(fields) {
         .join('');
       return `<div class="field"><label for="${id}">${label}${f.required ? ' *' : ''}</label><select id="${id}" name="${name}" ${req}>${opts}</select></div>`;
     }
+    if (f.type === 'checklist') {
+      const opts = (Array.isArray(f.options) ? f.options : String(f.options || '').split(','))
+        .map((o) => String(o).trim())
+        .filter(Boolean)
+        .map(
+          (o) =>
+            `<label style="display:flex;align-items:center;gap:8px;font-weight:500;margin:6px 0;cursor:pointer;"><input type="checkbox" name="${name}" value="${escapeHtml(o)}" style="width:16px;height:16px;accent-color:currentColor;" /> <span>${escapeHtml(o)}</span></label>`
+        )
+        .join('');
+      return `<div class="field"><label>${label}${f.required ? ' *' : ''}</label><div>${opts}</div></div>`;
+    }
+    if (f.type === 'checkbox') {
+      return `<div class="field"><label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;"><input id="${id}" type="checkbox" name="${name}" value="Yes" ${req} style="width:16px;height:16px;" /> <span>${label}${f.required ? ' *' : ''}</span></label></div>`;
+    }
     if (f.type === 'file') {
       return `<div class="field"><label for="${id}">${label}${f.required ? ' *' : ''}</label><input id="${id}" name="${name}" type="file" ${req} /></div>`;
     }

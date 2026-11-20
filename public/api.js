@@ -6,7 +6,7 @@ export function isDemoMode() {
   return IS_DEMO_MODE;
 }
 
-const DEMO_STORAGE_KEY = 'askforms_studio_demo_v2';
+const DEMO_STORAGE_KEY = 'askforms_demo_session_v3';
 
 const DEMO_CHANNEL_DEFS = [
   { id: 'email_resend', name: 'Email (Resend)', cost: 'Free (3,000/mo)', description: 'Formatted enquiry emails with 1-click Reply-To.', fields: [{ key: 'to', label: 'Recipient Email', placeholder: 'owner@yourdomain.com.au', type: 'email' }, { key: 'apiKey', label: 'Resend API Key', placeholder: 're_xxxxxxxxx', type: 'password' }] },
@@ -24,13 +24,12 @@ const DEMO_CHANNEL_DEFS = [
 ];
 
 function createDefaultDemoStore() {
-  const now = new Date().toISOString();
   return {
     workspace: {
       brand_name: 'AskForms',
-      website_url: 'https://harbourplumbing.com.au',
-      support_email: 'hello@harbourplumbing.com.au',
-      license_holder: 'Interactive Demo Mode',
+      website_url: '',
+      support_email: '',
+      license_holder: 'Interactive Preview',
       logo_url: '',
       accent_color: '#14383e',
       accent_text_color: '#ffffff',
@@ -42,105 +41,24 @@ function createDefaultDemoStore() {
       thanks_body: 'Thanks for reaching out. Our team will get back to you shortly.',
       email_footer: 'Sent via AskForms',
       email_provider: 'local',
-      mail_from: 'forms@harbourplumbing.com.au',
+      mail_from: 'forms@yourdomain.com.au',
       auth_enabled: false,
       license: {
         isLicensed: true,
-        licensedDomain: 'harbourplumbing.com.au',
-        holder: 'Interactive Demo Workspace',
-        message: 'Interactive Studio Demo (changes stay in your browser)',
+        licensedDomain: 'preview.askforms.app',
+        holder: 'Interactive Preview',
+        message: 'Temporary preview session (nothing is saved to our servers)',
       },
     },
-    forms: [
-      {
-        id: 'template-quote',
-        name: 'Fast Quote Request',
-        client_name: 'Trades & Services',
-        theme_preset: 'teagee',
-        email_recipients: 'quotes@harbourplumbing.com.au',
-        allowed_origins: '*',
-        redirect_url: '',
-        enable_honeypot: 1,
-        send_autoresponse: 1,
-        is_active: 1,
-        is_archived: 0,
-        submit_label: 'Send Quote Request',
-        multi_step: 1,
-        review_gate_url: '',
-        fields: [
-          { name: 'service_type', label: 'What do you need a quote for?', type: 'select', required: true, options: ['Emergency Repair', 'New Installation', 'Routine Maintenance'] },
-          { name: 'suburb', label: 'Suburb or Postcode', type: 'text', required: true, placeholder: 'Surry Hills 2010' },
-          { name: 'name', label: 'Your Name', type: 'text', required: true, placeholder: 'Alex Mercer' },
-          { name: 'phone', label: 'Mobile Number', type: 'tel', required: true, placeholder: '0412 345 678' },
-          { name: 'email', label: 'Email Address', type: 'email', required: true, placeholder: 'alex@example.com.au' },
-          { name: 'message', label: 'Job Details', type: 'textarea', required: true, placeholder: 'Describe the job...' },
-        ],
-      },
-      {
-        id: 'template-appointment',
-        name: 'Appointment Booking',
-        client_name: 'Appointments',
-        theme_preset: 'teagee',
-        email_recipients: 'bookings@harbourplumbing.com.au',
-        allowed_origins: '*',
-        redirect_url: '',
-        enable_honeypot: 1,
-        send_autoresponse: 1,
-        is_active: 1,
-        is_archived: 0,
-        submit_label: 'Request Appointment',
-        multi_step: 1,
-        review_gate_url: '',
-        fields: [
-          { name: 'appointment_type', label: 'Consultation Type', type: 'select', required: true, options: ['Initial Assessment', 'Standard Consultation', 'Discovery Call'] },
-          { name: 'preferred_day', label: 'Preferred Day', type: 'select', required: true, options: ['Next Available', 'Monday or Tuesday', 'Wednesday or Thursday'] },
-          { name: 'name', label: 'Full Name', type: 'text', required: true, placeholder: 'Sarah Jenkins' },
-          { name: 'email', label: 'Email Address', type: 'email', required: true, placeholder: 'sarah@example.com.au' },
-          { name: 'phone', label: 'Mobile Number', type: 'tel', required: true, placeholder: '0400 123 456' },
-        ],
-      },
-    ],
-    submissions: [
-      {
-        id: 'sub_demo_1',
-        form_id: 'template-quote',
-        form_name: 'Fast Quote Request',
-        sender_name: 'Tom Callahan',
-        sender_email: 'tom@callahanbuild.com.au',
-        subject: 'Fast Quote Request',
-        origin: 'https://harbourplumbing.com.au',
-        is_spam: 0,
-        status: 'new',
-        notes: 'Urgent callback requested.',
-        created_at: now,
-        data: { service_type: 'Emergency Repair', suburb: 'Surry Hills 2010', phone: '0418 294 110', message: 'Hot water system leaking in ground floor laundry, need a quote today.' },
-        attachments: [],
-      },
-      {
-        id: 'sub_demo_2',
-        form_id: 'template-appointment',
-        form_name: 'Appointment Booking',
-        sender_name: 'Sarah Jenkins',
-        sender_email: 'sarah.j@example.com.au',
-        subject: 'Appointment Booking',
-        origin: 'https://harbourplumbing.com.au',
-        is_spam: 0,
-        status: 'replied',
-        notes: 'Booked for Wednesday 9am.',
-        created_at: now,
-        data: { appointment_type: 'Initial Assessment', preferred_day: 'Wednesday or Thursday', phone: '0402 881 334', message: 'Looking for an initial site assessment next week.' },
-        attachments: [],
-      },
-    ],
-    channelsConfig: {
-      ntfy: { enabled: true, topic: 'askforms-demo-alerts' },
-    },
+    forms: [],
+    submissions: [],
+    channelsConfig: {},
   };
 }
 
 function loadDemoStore() {
   try {
-    const raw = localStorage.getItem(DEMO_STORAGE_KEY);
+    const raw = sessionStorage.getItem(DEMO_STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch {}
   const store = createDefaultDemoStore();
@@ -150,7 +68,7 @@ function loadDemoStore() {
 
 function saveDemoStore(store) {
   try {
-    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(store));
+    sessionStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(store));
   } catch {}
 }
 
@@ -324,7 +242,14 @@ export const api = {
         submit_label: payload.submit_label || 'Send Enquiry',
         multi_step: payload.multi_step ? 1 : 0,
         review_gate_url: '',
-        fields: Array.isArray(payload.fields) && payload.fields.length > 0 ? payload.fields : store.forms[0].fields,
+        fields:
+          Array.isArray(payload.fields) && payload.fields.length > 0
+            ? payload.fields
+            : [
+                { name: 'name', label: 'Full name', type: 'text', placeholder: 'Alex Mercer', required: true, half: true },
+                { name: 'email', label: 'Email address', type: 'email', placeholder: 'alex@example.com.au', required: true, half: true },
+                { name: 'message', label: 'How can we help?', type: 'textarea', placeholder: 'Tell us what you need...', required: true, half: false },
+              ],
       };
       store.forms.unshift(created);
       saveDemoStore(store);

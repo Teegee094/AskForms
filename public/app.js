@@ -1,4 +1,4 @@
-import { api, copyText, escapeHtml, formatRelativeTime, formatTimestamp, isDemoMode } from './api.js?v=5';
+import { api, copyText, escapeHtml, formatRelativeTime, formatTimestamp, isDemoMode } from './api.js?v=6';
 import { icons } from './icons.js?v=4';
 
 const state = {
@@ -317,6 +317,24 @@ function renderTopbar() {
     return;
   }
 
+  if (isDemoMode()) {
+    els.topbar.innerHTML = `
+      <div class="header-left" aria-hidden="true"></div>
+
+      <div class="header-right">
+        <nav class="header-nav" aria-label="Preview Primary">
+          <button class="header-nav-link ${state.view === 'forms' || state.view === 'form' ? 'active' : ''}" data-nav="forms">Forms</button>
+          <button class="header-nav-link ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Assistant</button>
+          <button class="header-nav-link ${state.view === 'channels' ? 'active' : ''}" data-nav="channels">Notifications</button>
+          <button class="header-nav-link ${state.view === 'workspace' ? 'active' : ''}" data-nav="workspace">Brand</button>
+        </nav>
+        <button type="button" class="btn btn-ghost btn-sm" data-action="reset-demo-studio" title="Clear preview session">Reset</button>
+        <a class="btn btn-primary btn-sm" href="/#pricing">Buy License · $149</a>
+      </div>
+    `;
+    return;
+  }
+
   els.topbar.innerHTML = `
     <div class="header-left" aria-hidden="true"></div>
 
@@ -325,14 +343,11 @@ function renderTopbar() {
         <button class="header-nav-link ${state.view === 'forms' || state.view === 'form' ? 'active' : ''}" data-nav="forms">Forms</button>
         <button class="header-nav-link ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Assistant</button>
         <button class="header-nav-link ${state.view === 'channels' ? 'active' : ''}" data-nav="channels">Notifications</button>
-        <button class="header-nav-link ${state.view === 'sandbox' ? 'active' : ''}" data-nav="sandbox">Sandbox</button>
         <button class="header-nav-link ${state.view === 'mail' || state.view === 'webhooks' ? 'active' : ''}" data-nav="mail">Activity</button>
         <button class="header-nav-link ${state.view === 'workspace' || state.view === 'setup' ? 'active' : ''}" data-nav="workspace">Brand</button>
       </nav>
       ${
-        isDemoMode()
-          ? `<a class="btn btn-primary btn-sm" href="/#pricing">Buy License · $149</a>`
-          : impersonatedBy
+        impersonatedBy
           ? `<button type="button" class="btn btn-secondary btn-sm" data-action="exit-impersonation" style="white-space:nowrap;">← Partner Portal</button>
              <a class="btn btn-primary btn-sm" href="/manage" target="_blank" rel="noopener">Owner Inbox</a>`
           : `<a class="btn btn-primary btn-sm" href="/manage" target="_blank" rel="noopener">Owner Inbox</a>
@@ -428,10 +443,16 @@ function renderSidebar() {
             ? `<button class="tree-form-btn ${state.view === 'partner-clients' ? 'active' : ''}" data-nav="partner-clients">Clients &amp; Keys</button>
                <button class="tree-form-btn ${state.view === 'forms' ? 'active' : ''}" data-nav="forms">Client Forms</button>
                <button class="tree-form-btn ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Form Builder</button>`
+            : isDemoMode()
+            ? `<button class="tree-form-btn ${state.view === 'forms' ? 'active' : ''}" data-nav="forms">Forms</button>
+               <button class="tree-form-btn ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Assistant</button>
+               <button class="tree-form-btn ${state.view === 'channels' ? 'active' : ''}" data-nav="channels">Notifications</button>
+               <button class="tree-form-btn ${state.view === 'workspace' ? 'active' : ''}" data-nav="workspace">Brand</button>`
             : `<button class="tree-form-btn ${state.view === 'forms' ? 'active' : ''}" data-nav="forms">Forms</button>
-               <button class="tree-form-btn ${state.view === 'sandbox' ? 'active' : ''}" data-nav="sandbox">Sandbox</button>
-               <button class="tree-form-btn ${state.view === 'mail' || state.view === 'webhooks' ? 'active' : ''}" data-nav="mail">Activity (Mail &amp; Webhooks)</button>
-               <button class="tree-form-btn ${state.view === 'workspace' || state.view === 'setup' ? 'active' : ''}" data-nav="workspace">Brand &amp; Setup</button>`
+               <button class="tree-form-btn ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Assistant</button>
+               <button class="tree-form-btn ${state.view === 'channels' ? 'active' : ''}" data-nav="channels">Notifications</button>
+               <button class="tree-form-btn ${state.view === 'mail' || state.view === 'webhooks' ? 'active' : ''}" data-nav="mail">Activity</button>
+               <button class="tree-form-btn ${state.view === 'workspace' || state.view === 'setup' ? 'active' : ''}" data-nav="workspace">Brand</button>`
         }
       </div>
 
@@ -446,6 +467,8 @@ function renderSidebar() {
                  <button class="sidebar-text-link" data-action="open-create-modal">${icons.plus} New Form</button>
                </div>
              </div>`
+          : isDemoMode()
+          ? ''
           : `<div class="sidebar-footer">
                <div class="sidebar-footer-links">
                  <button class="sidebar-text-link" data-nav="setup">${icons.wizard} Setup Wizard</button>
@@ -597,7 +620,7 @@ function renderFormsOverview() {
           </div>
           <div class="hero-actions">
             <a class="btn btn-mint" href="/manage" target="_blank" rel="noopener">Open Owner Portal ${icons.external}</a>
-            <button class="btn btn-hero-ghost" data-nav="sandbox">${icons.sandbox} Test Sandbox</button>
+            <button class="btn btn-hero-ghost" data-nav="assistant">${icons.sparkles || icons.plus} Build with AI</button>
           </div>
         </section>
 
@@ -664,16 +687,14 @@ function renderFormWorkspace() {
         <div class="page-band-top">
           <h1 class="page-band-title">${escapeHtml(f.name)}</h1>
           <div class="toolbar-group">
-            <button class="endpoint-pill" data-copy="${escapeHtml(endpoint)}" title="Copy endpoint URL">
-              <span class="endpoint-method">POST</span>
-              <span>/f/${escapeHtml(f.id)}</span>
-              ${icons.copy}
+            <button class="btn btn-secondary" data-copy="${escapeHtml(`${state.baseUrl}/embed/${f.id}`)}" title="Copy shareable form link">
+              ${icons.copy} Copy Link
             </button>
             <button type="button" class="btn btn-secondary" data-archive-form="${escapeHtml(f.id)}" data-target-archive="${f.is_archived ? '0' : '1'}">
               ${f.is_archived ? `${icons.restore} Restore` : `${icons.archive} Archive`}
             </button>
             <button type="button" class="btn btn-primary" data-test-popout="${escapeHtml(f.id)}">
-              ${icons.popout} Test Popout
+              ${icons.popout} Test Form
             </button>
           </div>
         </div>
@@ -774,6 +795,8 @@ function renderFormBuilderTab(f) {
             <option value="tel" ${field.type === 'tel' ? 'selected' : ''}>Phone</option>
             <option value="url" ${field.type === 'url' ? 'selected' : ''}>Website URL</option>
             <option value="select" ${field.type === 'select' ? 'selected' : ''}>Dropdown</option>
+            <option value="checklist" ${field.type === 'checklist' ? 'selected' : ''}>Checklist (tick multiple)</option>
+            <option value="checkbox" ${field.type === 'checkbox' ? 'selected' : ''}>Single checkbox</option>
             <option value="textarea" ${field.type === 'textarea' ? 'selected' : ''}>Long text</option>
             <option value="date" ${field.type === 'date' ? 'selected' : ''}>Date</option>
             <option value="file" ${field.type === 'file' ? 'selected' : ''}>File upload</option>
@@ -786,10 +809,10 @@ function renderFormBuilderTab(f) {
         </div>
 
         ${
-          field.type === 'select'
-            ? `<input class="input" data-bf-prop="options" data-bf-idx="${idx}" value="${escapeHtml(Array.isArray(field.options) ? field.options.join(', ') : (field.options || ''))}" placeholder="Comma-separated options, e.g. Sales, Support, Quote" />`
-            : field.type !== 'file' && field.type !== 'date'
-            ? `<input class="input" data-bf-prop="placeholder" data-bf-idx="${idx}" value="${escapeHtml(field.placeholder || '')}" placeholder="Placeholder text (optional)" />`
+          field.type === 'select' || field.type === 'checklist'
+            ? `<input class="input" data-bf-prop="options" data-bf-idx="${idx}" value="${escapeHtml(Array.isArray(field.options) ? field.options.join(', ') : (field.options || ''))}" placeholder="Comma-separated choices, e.g. Sales, Support, Quote" />`
+            : field.type !== 'file' && field.type !== 'date' && field.type !== 'checkbox'
+            ? `<input class="input" data-bf-prop="placeholder" data-bf-idx="${idx}" value="${escapeHtml(field.placeholder || '')}" placeholder="Example hint text (optional)" />`
             : ''
         }
 
@@ -955,8 +978,8 @@ function renderFormSubmissionsTab(f) {
         state.submissions.length === 0
           ? `<div class="empty-state">
               <div class="empty-state-title">No ${state.subFilter === 'spam' ? 'spam' : 'enquiries'} yet</div>
-              <p>Send a test enquiry from the Sandbox or embed this form on your website.</p>
-              <button class="btn btn-primary btn-sm" data-test-form="${escapeHtml(f.id)}">Test in Sandbox</button>
+              <p>Try submitting your form right now or add it to your website.</p>
+              <button class="btn btn-primary btn-sm" data-test-popout="${escapeHtml(f.id)}">${icons.popout} Test Form</button>
             </div>`
           : `<div class="table-wrap">
               <table class="data-table">
@@ -1521,62 +1544,31 @@ function renderFormSettingsTab(f) {
             <input class="input" id="set-name" name="name" value="${escapeHtml(f.name)}" required />
           </div>
           <div class="field-group">
-            <label class="field-label" for="set-client">Client / Project</label>
+            <label class="field-label" for="set-client">Client / Group</label>
             <input class="input" id="set-client" name="client_name" value="${escapeHtml(f.client_name)}" />
           </div>
         </div>
 
         <div class="form-grid-2">
-          <div class="field-group">
-            <label class="field-label" for="set-recipients">Notification recipients</label>
-            <input class="input" id="set-recipients" name="email_recipients" value="${escapeHtml(f.email_recipients)}" placeholder="team@client.com.au" />
-            <div class="field-hint">Comma-separated email addresses.</div>
-          </div>
-          <div class="field-group">
-            <label class="field-label" for="set-theme">Client preview theme</label>
-            <select class="select" id="set-theme" name="theme_preset">
-              <option value="teagee" ${f.theme_preset === 'teagee' ? 'selected' : ''}>Teagee Labs</option>
-              <option value="centella" ${f.theme_preset === 'centella' ? 'selected' : ''}>Centella</option>
-              <option value="sintiro" ${f.theme_preset === 'sintiro' ? 'selected' : ''}>Sintiro</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-grid-2">
           <div class="field-group" style="margin-bottom:0;">
-            <label class="field-label" for="set-redirect">Default redirect URL (_next fallback)</label>
-            <input class="input" id="set-redirect" name="redirect_url" value="${escapeHtml(f.redirect_url)}" placeholder="Leave blank for hosted /thanks page" />
+            <label class="field-label" for="set-recipients">Send enquiries to (Email)</label>
+            <input class="input" id="set-recipients" name="email_recipients" value="${escapeHtml(f.email_recipients)}" placeholder="hello@yourbusiness.com.au" />
+            <div class="field-hint">Separate multiple emails with a comma.</div>
           </div>
           <div class="field-group" style="margin-bottom:0;">
-            <label class="field-label" for="set-rate">Rate limit (requests / hour / IP)</label>
-            <input class="input" id="set-rate" name="rate_limit_per_hour" type="number" min="1" value="${escapeHtml(f.rate_limit_per_hour)}" />
+            <label class="field-label" for="set-redirect">Thank-you page URL (optional)</label>
+            <input class="input" id="set-redirect" name="redirect_url" value="${escapeHtml(f.redirect_url)}" placeholder="Leave blank for default confirmation" />
           </div>
         </div>
       </div>
 
       <div class="card card-padded">
-        <h2 class="section-title">Security & spam controls</h2>
-        <div class="field-group">
-          <label class="field-label" for="set-origins">Allowed origins (CORS domain whitelist)</label>
-          <input class="input mono" id="set-origins" name="allowed_origins" value="${escapeHtml(f.allowed_origins)}" placeholder="* or client.com.au, www.client.com.au" />
-          <div class="field-hint">Use <span class="mono">*</span> for open ingestion, or restrict to specific client domains. Localhost is always allowed for local testing.</div>
-        </div>
+        <h2 class="section-title">Spam protection &amp; status</h2>
 
-        <div class="form-grid-2">
-          <div class="field-group">
-            <label class="field-label" for="set-ts-site">Cloudflare Turnstile Site Key</label>
-            <input class="input mono" id="set-ts-site" name="turnstile_site_key" value="${escapeHtml(f.turnstile_site_key || '')}" placeholder="0x4AAAAAAA..." />
-          </div>
-          <div class="field-group">
-            <label class="field-label" for="set-ts-secret">Cloudflare Turnstile Secret Key</label>
-            <input class="input mono" id="set-ts-secret" name="turnstile_secret_key" type="password" value="${escapeHtml(f.turnstile_secret_key || '')}" placeholder="0x4AAAAAAA..." autocomplete="new-password" />
-          </div>
-        </div>
-
-        <div class="toggle-row">
+        <div class="toggle-row" style="padding-top:0;">
           <div>
-            <div class="cell-primary">Honeypot spam filter (_gotcha)</div>
-            <div class="cell-secondary">Silently quarantine requests where the hidden _gotcha field contains text.</div>
+            <div class="cell-primary">Automatic spam protection</div>
+            <div class="cell-secondary">Silently blocks spam bots without adding puzzles for real visitors.</div>
           </div>
           <label class="toggle-switch">
             <input type="checkbox" name="enable_honeypot" ${f.enable_honeypot ? 'checked' : ''} />
@@ -1586,14 +1578,40 @@ function renderFormSettingsTab(f) {
 
         <div class="toggle-row">
           <div>
-            <div class="cell-primary">Endpoint active</div>
-            <div class="cell-secondary">Pause to reject incoming submissions with HTTP 403.</div>
+            <div class="cell-primary">Form active</div>
+            <div class="cell-secondary">Turn off to temporarily pause incoming enquiries on this form.</div>
           </div>
           <label class="toggle-switch">
             <input type="checkbox" name="is_active" ${f.is_active ? 'checked' : ''} />
             <span class="toggle-track"></span>
           </label>
         </div>
+
+        <details style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-subtle);">
+          <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-secondary);">Advanced security options (optional)</summary>
+          <div style="margin-top:14px;">
+            <div class="form-grid-2">
+              <div class="field-group">
+                <label class="field-label" for="set-origins">Restrict to website domains</label>
+                <input class="input mono" id="set-origins" name="allowed_origins" value="${escapeHtml(f.allowed_origins || '*')}" placeholder="* (all domains)" />
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="set-rate">Max submissions per hour</label>
+                <input class="input" id="set-rate" name="rate_limit_per_hour" type="number" min="1" value="${escapeHtml(f.rate_limit_per_hour || 60)}" />
+              </div>
+            </div>
+            <div class="form-grid-2">
+              <div class="field-group" style="margin-bottom:0;">
+                <label class="field-label" for="set-ts-site">Cloudflare Turnstile Site Key</label>
+                <input class="input mono" id="set-ts-site" name="turnstile_site_key" value="${escapeHtml(f.turnstile_site_key || '')}" placeholder="Optional" />
+              </div>
+              <div class="field-group" style="margin-bottom:0;">
+                <label class="field-label" for="set-ts-secret">Cloudflare Turnstile Secret Key</label>
+                <input class="input mono" id="set-ts-secret" name="turnstile_secret_key" type="password" value="${escapeHtml(f.turnstile_secret_key || '')}" placeholder="Optional" autocomplete="new-password" />
+              </div>
+            </div>
+          </div>
+        </details>
       </div>
 
       <div class="card card-padded">
@@ -1821,7 +1839,6 @@ function renderMailOutboxView() {
         <div class="page-band-top">
           <h1 class="page-band-title">Activity</h1>
           <div class="toolbar-group">
-            <button class="btn btn-secondary" data-nav="sandbox">${icons.sandbox} Test Sandbox</button>
             <button class="btn btn-primary" data-action="open-create-modal">${icons.plus} New Form</button>
           </div>
         </div>
@@ -1976,7 +1993,6 @@ function renderWebhookLogsView() {
         <div class="page-band-top">
           <h1 class="page-band-title">Activity</h1>
           <div class="toolbar-group">
-            <button class="btn btn-secondary" data-nav="sandbox">${icons.sandbox} Test Sandbox</button>
             <button class="btn btn-primary" data-action="open-create-modal">${icons.plus} New Form</button>
           </div>
         </div>
@@ -2177,52 +2193,47 @@ function renderDrawer() {
 function openCreateModal(defaultClientName = '') {
   els.modal.classList.remove('hidden');
   els.modalBackdrop.classList.remove('hidden');
+  const partner = isPartnerSession();
 
   els.modal.innerHTML = `
     <div class="drawer-header">
-      <strong>Create form endpoint</strong>
+      <strong>Create a new form</strong>
       <button class="btn btn-ghost btn-sm" data-action="close-modal" aria-label="Close">${icons.close}</button>
     </div>
     <form id="create-form-modal" class="modal-body">
       <div class="field-group">
         <label class="field-label" for="new-name">Form name</label>
-        <input class="input" id="new-name" name="name" placeholder="Client Contact Form" required />
+        <input class="input" id="new-name" name="name" placeholder="e.g. Quote Request or Contact Us" required />
       </div>
 
-      <div class="form-grid-2">
-        <div class="field-group">
-          <label class="field-label" for="new-client">Client / Project</label>
-          <input class="input" id="new-client" name="client_name" value="${escapeHtml(defaultClientName)}" placeholder="Client Business Name" />
-        </div>
-        <div class="field-group">
-          <label class="field-label" for="new-id">Custom endpoint slug</label>
-          <input class="input mono" id="new-id" name="id" placeholder="auto-generated" />
-        </div>
+      ${
+        partner || defaultClientName
+          ? `<div class="field-group">
+               <label class="field-label" for="new-client">Client business name</label>
+               <input class="input" id="new-client" name="client_name" value="${escapeHtml(defaultClientName)}" placeholder="e.g. Harbour Plumbing Co" />
+             </div>`
+          : `<input type="hidden" name="client_name" value="${escapeHtml(state.workspace?.brand_name || 'Website')}" />`
+      }
+
+      <div class="field-group">
+        <label class="field-label" for="new-recipients">Send enquiries to (Email)</label>
+        <input class="input" id="new-recipients" name="email_recipients" type="email" placeholder="hello@yourbusiness.com.au" />
       </div>
 
       <div class="field-group">
-        <label class="field-label" for="new-recipients">Notification recipients</label>
-        <input class="input" id="new-recipients" name="email_recipients" placeholder="hello@client.com.au" />
-      </div>
-
-      <div class="form-grid-2">
-        <div class="field-group">
-          <label class="field-label" for="new-origins">Allowed origins</label>
-          <input class="input mono" id="new-origins" name="allowed_origins" value="*" />
-        </div>
-        <div class="field-group">
-          <label class="field-label" for="new-theme">Preview style</label>
-          <select class="select" id="new-theme" name="theme_preset">
-            <option value="teagee">Teagee Labs</option>
-            <option value="centella">Centella</option>
-            <option value="sintiro">Sintiro</option>
-          </select>
-        </div>
+        <label class="field-label" for="new-template">Starting fields</label>
+        <select class="select" id="new-template" name="template">
+          <option value="general">General Contact (Name, Email, Phone, Message)</option>
+          <option value="trades">Quote Request (Service Dropdown, Suburb, Photo Upload)</option>
+          <option value="callback">Quick Callback (Name, Phone, Best Time Dropdown)</option>
+          <option value="blank">Blank Form (build your own fields from scratch)</option>
+        </select>
+        <div class="field-hint">You can add or edit dropdowns, checklists, text fields, and uploads on the next screen.</div>
       </div>
 
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
         <button type="button" class="btn btn-secondary" data-action="close-modal">Cancel</button>
-        <button type="submit" class="btn btn-primary">Create endpoint</button>
+        <button type="submit" class="btn btn-primary">Create Form &amp; Edit Fields</button>
       </div>
     </form>
   `;
@@ -3374,7 +3385,11 @@ document.addEventListener('click', async (e) => {
   }
 
   if (target.closest('[data-action="reset-demo-studio"]')) {
-    try { localStorage.removeItem('askforms_studio_demo_v1'); } catch {}
+    try {
+      sessionStorage.removeItem('askforms_demo_session_v3');
+      localStorage.removeItem('askforms_studio_demo_v2');
+      localStorage.removeItem('askforms_studio_demo_v1');
+    } catch {}
     window.location.reload();
     return;
   }
@@ -4456,19 +4471,26 @@ document.addEventListener('submit', async (e) => {
   if (form.id === 'create-form-modal') {
     e.preventDefault();
     const fd = new FormData(form);
+    const tplKey = String(fd.get('template') || 'general');
+    const tpl = ENQUIRY_TEMPLATES[tplKey];
+    const starterFields =
+      tplKey === 'blank'
+        ? [{ name: 'name', label: 'Full name', type: 'text', placeholder: 'Your name', required: true, half: false }]
+        : tpl?.fields || ENQUIRY_TEMPLATES.general.fields;
     try {
       const { form: created } = await api.createForm({
         name: fd.get('name'),
-        client_name: fd.get('client_name') || 'Internal',
-        id: fd.get('id') || undefined,
-        email_recipients: fd.get('email_recipients'),
-        allowed_origins: fd.get('allowed_origins') || '*',
-        theme_preset: fd.get('theme_preset') || 'teagee',
+        client_name: fd.get('client_name') || state.workspace?.brand_name || 'Website',
+        email_recipients: fd.get('email_recipients') || '',
+        allowed_origins: '*',
+        fields: starterFields,
+        submit_label: tpl?.submitLabel || 'Send Enquiry',
+        multi_step: Boolean(tpl?.multiStep),
       });
       closeModal();
       await refreshBootstrap();
-      await openForm(created.id, 'integration');
-      showToast(`Created endpoint /f/${created.id}`);
+      await openForm(created.id, 'builder');
+      showToast(`Created "${created.name}"`);
     } catch (err) {
       showToast(err.message);
     }
@@ -4527,12 +4549,11 @@ document.addEventListener('submit', async (e) => {
         name: fd.get('name'),
         client_name: fd.get('client_name'),
         email_recipients: fd.get('email_recipients'),
-        theme_preset: fd.get('theme_preset'),
         redirect_url: fd.get('redirect_url'),
-        rate_limit_per_hour: Number(fd.get('rate_limit_per_hour')),
-        allowed_origins: fd.get('allowed_origins'),
-        turnstile_site_key: fd.get('turnstile_site_key'),
-        turnstile_secret_key: fd.get('turnstile_secret_key'),
+        rate_limit_per_hour: Number(fd.get('rate_limit_per_hour') || 60),
+        allowed_origins: fd.get('allowed_origins') || '*',
+        turnstile_site_key: fd.get('turnstile_site_key') || '',
+        turnstile_secret_key: fd.get('turnstile_secret_key') || '',
         enable_honeypot: fd.get('enable_honeypot') === 'on',
         is_active: fd.get('is_active') === 'on',
         send_autoresponse: fd.get('send_autoresponse') === 'on',
