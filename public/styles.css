@@ -1505,7 +1505,7 @@ table.data-table tbody tr.clickable:hover { background: var(--bg-hover); }
 .empty-state { padding: 60px 24px; text-align: center; color: var(--ink-muted); }
 .empty-state-title { font-size: 17px; font-weight: 700; color: var(--ink-primary); margin-bottom: 8px; }
 
-.toast-container { position: fixed; bottom: 28px; right: 28px; z-index: 80; display: flex; flex-direction: column; gap: 10px; }
+.toast-container { position: fixed; top: 82px; right: 24px; z-index: 2147483647; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
 .toast { background: var(--brand-petrol); color: #ffffff; padding: 12px 20px; border-radius: var(--radius-pill); font-size: 13.5px; font-weight: 600; box-shadow: var(--shadow-popover); }
 
 .auth-screen { min-height: 100vh; width: 100%; display: grid; place-items: center; padding: 24px; background: var(--bg-canvas); }
@@ -1886,5 +1886,181 @@ table.data-table tbody tr.clickable:hover { background: var(--bg-hover); }
   .ai-chat-popup {
     width: calc(100vw - 32px);
     height: min(520px, calc(100vh - 96px));
+  }
+}
+
+/* ============================================================
+   PREMIUM INTERACTIVE DRAG-AND-DROP FORM BUILDER
+   ============================================================ */
+.dnd-palette {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--bg-canvas, #f7fafc);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  margin-bottom: 16px;
+}
+
+.dnd-palette-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted, #64748b);
+  margin-right: 4px;
+}
+
+.dnd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #dce6ea);
+  background: #ffffff;
+  color: var(--ink-primary, #0f172a);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: grab;
+  user-select: none;
+  transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.dnd-chip:hover {
+  border-color: var(--accent, #14383e);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px -3px rgba(12, 38, 43, 0.16);
+}
+
+.dnd-chip:active {
+  cursor: grabbing;
+}
+
+.dnd-canvas-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-height: 120px;
+  margin-bottom: 16px;
+}
+
+.dnd-field-card {
+  grid-column: span 2;
+  background: #ffffff;
+  border: 1.5px solid var(--border-subtle, #e2e8f0);
+  border-radius: 14px;
+  padding: 12px 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+}
+
+.dnd-field-card.is-half {
+  grid-column: span 1;
+}
+
+.dnd-field-card:hover {
+  border-color: var(--border-strong, #cbd5e1);
+  box-shadow: 0 6px 18px -8px rgba(12, 38, 43, 0.12);
+}
+
+.dnd-field-card.is-selected {
+  border-color: var(--accent, #14383e);
+  box-shadow: 0 0 0 3px rgba(20, 56, 62, 0.08);
+}
+
+.dnd-field-card.is-dragging {
+  opacity: 0.42;
+  transform: scale(0.98);
+}
+
+.dnd-field-card.is-over {
+  border-color: var(--brand-mint, #4fd1c5);
+  box-shadow: 0 0 0 3px rgba(79, 209, 197, 0.28);
+}
+
+.dnd-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dnd-card-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dnd-handle {
+  color: var(--ink-faint, #94a3b8);
+  cursor: grab;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.dnd-handle:active {
+  cursor: grabbing;
+}
+
+.dnd-card-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-primary, #0f172a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dnd-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.dnd-pill-btn {
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  background: var(--bg-canvas, #f7fafc);
+  color: var(--ink-secondary, #475569);
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.dnd-pill-btn.active {
+  background: var(--accent, #14383e);
+  border-color: var(--accent, #14383e);
+  color: #ffffff;
+}
+
+.dnd-card-editor {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle, #e2e8f0);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .dnd-canvas-grid {
+    grid-template-columns: 1fr;
+  }
+  .dnd-field-card,
+  .dnd-field-card.is-half {
+    grid-column: span 1;
   }
 }

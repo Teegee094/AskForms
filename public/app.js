@@ -40,6 +40,7 @@ const state = {
   popoutLabel: 'Get a Quote',
   embedPlatform: 'webflow', // 'webflow' | 'wordpress' | 'squarespace' | 'wix' | 'html'
   builderFields: [],
+  selectedFieldIdx: 0,
   builderSubmitLabel: 'Send enquiry',
   builderMultiStep: false,
   builderReviewGateUrl: '',
@@ -328,8 +329,7 @@ function renderTopbar() {
           <button class="header-nav-link ${state.view === 'forms' || state.view === 'form' ? 'active' : ''}" data-nav="forms">Forms</button>
           <button class="header-nav-link ${state.view === 'workspace' || state.view === 'channels' || state.view === 'setup' ? 'active' : ''}" data-nav="channels">Settings</button>
         </nav>
-        <button type="button" class="btn btn-ghost btn-sm" data-action="reset-demo-studio" title="Clear preview session">Reset</button>
-        <a class="btn btn-primary btn-sm" href="/#pricing">Buy License · $149</a>
+        <button type="button" class="btn btn-primary btn-sm" data-action="open-checkout-drawer">Buy License · $149</button>
       </div>
     `;
     return;
@@ -877,110 +877,145 @@ function buildLiveFormPreviewDoc(form, fieldsOverride = null) {
 
 function renderFormBuilderTab(f) {
   const fields = state.builderFields || [];
+  const paletteTypes = [
+    { type: 'text', label: 'Short Text' },
+    { type: 'email', label: 'Email' },
+    { type: 'tel', label: 'Phone' },
+    { type: 'select', label: 'Dropdown' },
+    { type: 'checklist', label: 'Checklist' },
+    { type: 'checkbox', label: 'Checkbox' },
+    { type: 'textarea', label: 'Long Text' },
+    { type: 'date', label: 'Date' },
+    { type: 'file', label: 'File Upload' },
+  ];
+  const typeNames = {
+    text: 'Text',
+    email: 'Email',
+    tel: 'Phone',
+    url: 'URL',
+    select: 'Dropdown',
+    checklist: 'Checklist',
+    checkbox: 'Checkbox',
+    textarea: 'Long Text',
+    date: 'Date',
+    file: 'File',
+  };
+  const gripSvg = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="5" cy="3.5" r="1.3"/><circle cx="11" cy="3.5" r="1.3"/><circle cx="5" cy="8" r="1.3"/><circle cx="11" cy="8" r="1.3"/><circle cx="5" cy="12.5" r="1.3"/><circle cx="11" cy="12.5" r="1.3"/></svg>`;
 
-  const fieldCards = fields
-    .map(
-      (field, idx) => `
-      <div class="builder-field-row" data-field-idx="${idx}">
-        <div class="builder-row-grid">
-          <input class="input" data-bf-prop="label" data-bf-idx="${idx}" value="${escapeHtml(field.label || '')}" placeholder="Field label" />
-          <select class="select" data-bf-prop="type" data-bf-idx="${idx}">
-            <option value="text" ${field.type === 'text' ? 'selected' : ''}>Short text</option>
-            <option value="email" ${field.type === 'email' ? 'selected' : ''}>Email</option>
-            <option value="tel" ${field.type === 'tel' ? 'selected' : ''}>Phone</option>
-            <option value="url" ${field.type === 'url' ? 'selected' : ''}>Website URL</option>
-            <option value="select" ${field.type === 'select' ? 'selected' : ''}>Dropdown</option>
-            <option value="checklist" ${field.type === 'checklist' ? 'selected' : ''}>Checklist (tick multiple)</option>
-            <option value="checkbox" ${field.type === 'checkbox' ? 'selected' : ''}>Single checkbox</option>
-            <option value="textarea" ${field.type === 'textarea' ? 'selected' : ''}>Long text</option>
-            <option value="date" ${field.type === 'date' ? 'selected' : ''}>Date</option>
-            <option value="file" ${field.type === 'file' ? 'selected' : ''}>File upload</option>
-          </select>
-          <div style="display:flex;gap:4px;">
-            <button type="button" class="btn btn-ghost btn-sm" style="padding:0 7px;" data-bf-move="${idx}" data-dir="-1" ${idx === 0 ? 'disabled' : ''} title="Move up">&uarr;</button>
-            <button type="button" class="btn btn-ghost btn-sm" style="padding:0 7px;" data-bf-move="${idx}" data-dir="1" ${idx === fields.length - 1 ? 'disabled' : ''} title="Move down">&darr;</button>
-            <button type="button" class="btn btn-ghost btn-sm" style="padding:0 7px;color:var(--danger);" data-bf-remove="${idx}" title="Remove">${icons.trash}</button>
-          </div>
-        </div>
+  const fieldCards =
+    fields.length === 0
+      ? `<div style="grid-column:span 2;padding:34px 20px;text-align:center;border:1.5px dashed var(--border);border-radius:14px;color:var(--ink-muted);font-size:13px;">
+           Drag or click any field chip above to start building your form.
+         </div>`
+      : fields
+          .map((field, idx) => {
+            const isSelected = state.selectedFieldIdx === idx;
+            return `
+              <div
+                class="dnd-field-card ${field.half ? 'is-half' : ''} ${isSelected ? 'is-selected' : ''}"
+                draggable="true"
+                data-dnd-idx="${idx}"
+                data-select-field="${idx}"
+              >
+                <div class="dnd-card-head">
+                  <div class="dnd-card-left">
+                    <span class="dnd-handle" title="Drag to reorder">${gripSvg}</span>
+                    <span class="dnd-card-label">${escapeHtml(field.label || 'Untitled field')}${field.required ? ' <span style="color:var(--danger);">*</span>' : ''}</span>
+                    <span class="tag" style="font-size:10px;padding:1px 6px;">${escapeHtml(typeNames[field.type] || field.type)}</span>
+                  </div>
+                  <div class="dnd-card-actions" data-stop-prop="1">
+                    <button type="button" class="dnd-pill-btn ${field.half ? 'active' : ''}" data-bf-toggle-half="${idx}" title="Toggle half / full width">${field.half ? '1/2' : 'Full'}</button>
+                    <button type="button" class="dnd-pill-btn ${field.required ? 'active' : ''}" data-bf-toggle-req="${idx}" title="Toggle required">Req</button>
+                    <button type="button" class="btn btn-ghost btn-sm" style="padding:0 5px;height:24px;color:var(--danger);" data-bf-remove="${idx}" title="Delete field">${icons.trash}</button>
+                  </div>
+                </div>
 
-        ${
-          field.type === 'select' || field.type === 'checklist'
-            ? `<input class="input" data-bf-prop="options" data-bf-idx="${idx}" value="${escapeHtml(Array.isArray(field.options) ? field.options.join(', ') : (field.options || ''))}" placeholder="Comma-separated choices, e.g. Sales, Support, Quote" />`
-            : field.type !== 'file' && field.type !== 'date' && field.type !== 'checkbox'
-            ? `<input class="input" data-bf-prop="placeholder" data-bf-idx="${idx}" value="${escapeHtml(field.placeholder || '')}" placeholder="Example hint text (optional)" />`
-            : ''
-        }
-
-        <div class="builder-row-meta">
-          <div style="display:flex;align-items:center;gap:14px;font-size:12.5px;color:var(--ink-secondary);">
-            <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" data-bf-prop="required" data-bf-idx="${idx}" ${field.required ? 'checked' : ''} /> Required
-            </label>
-            <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" data-bf-prop="half" data-bf-idx="${idx}" ${field.half ? 'checked' : ''} /> Half width
-            </label>
-          </div>
-          <span class="cell-mono" style="font-size:11px;">name="${escapeHtml(field.name)}"</span>
-        </div>
-      </div>
-    `
-    )
-    .join('');
+                ${
+                  isSelected
+                    ? `<div class="dnd-card-editor" data-stop-prop="1">
+                         <div class="form-grid-2" style="gap:8px;">
+                           <input class="input" style="height:34px;font-size:13px;" data-bf-prop="label" data-bf-idx="${idx}" value="${escapeHtml(field.label || '')}" placeholder="Question / Field label" />
+                           <select class="select" style="height:34px;font-size:13px;" data-bf-prop="type" data-bf-idx="${idx}">
+                             <option value="text" ${field.type === 'text' ? 'selected' : ''}>Short text</option>
+                             <option value="email" ${field.type === 'email' ? 'selected' : ''}>Email</option>
+                             <option value="tel" ${field.type === 'tel' ? 'selected' : ''}>Phone</option>
+                             <option value="url" ${field.type === 'url' ? 'selected' : ''}>Website URL</option>
+                             <option value="select" ${field.type === 'select' ? 'selected' : ''}>Dropdown</option>
+                             <option value="checklist" ${field.type === 'checklist' ? 'selected' : ''}>Checklist (tick multiple)</option>
+                             <option value="checkbox" ${field.type === 'checkbox' ? 'selected' : ''}>Single checkbox</option>
+                             <option value="textarea" ${field.type === 'textarea' ? 'selected' : ''}>Long text</option>
+                             <option value="date" ${field.type === 'date' ? 'selected' : ''}>Date</option>
+                             <option value="file" ${field.type === 'file' ? 'selected' : ''}>File upload</option>
+                           </select>
+                         </div>
+                         ${
+                           field.type === 'select' || field.type === 'checklist'
+                             ? `<input class="input" style="height:34px;font-size:13px;" data-bf-prop="options" data-bf-idx="${idx}" value="${escapeHtml(Array.isArray(field.options) ? field.options.join(', ') : (field.options || ''))}" placeholder="Comma-separated choices, e.g. Repair, Install, Maintenance" />`
+                             : field.type !== 'file' && field.type !== 'date' && field.type !== 'checkbox'
+                             ? `<input class="input" style="height:34px;font-size:13px;" data-bf-prop="placeholder" data-bf-idx="${idx}" value="${escapeHtml(field.placeholder || '')}" placeholder="Hint text inside input (optional)" />`
+                             : ''
+                         }
+                       </div>`
+                    : ''
+                }
+              </div>
+            `;
+          })
+          .join('');
 
   return `
     <div class="split-grid">
       <div class="card card-padded">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-          <h2 class="section-title" style="margin:0;">Enquiry fields</h2>
+          <div>
+            <h2 class="section-title" style="margin:0;">Interactive Form Builder</h2>
+            <div class="cell-secondary" style="font-size:12.5px;margin-top:2px;">Drag fields to reorder, click any field to edit, or toggle 1/2 width to sit fields side-by-side.</div>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" data-bf-save="1">Save Form</button>
+        </div>
+
+        <div class="dnd-palette">
+          <span class="dnd-palette-label">Add field:</span>
+          ${paletteTypes
+            .map((p) => `<button type="button" class="dnd-chip" draggable="true" data-dnd-add="${p.type}">+ ${p.label}</button>`)
+            .join('')}
+        </div>
+
+        <div id="dnd-canvas-grid" class="dnd-canvas-grid">
+          ${fieldCards}
+        </div>
+
+        <div class="form-grid-2" style="padding-top:14px;border-top:1px solid var(--border-subtle);margin-bottom:12px;">
+          <div class="field-group" style="margin:0;">
+            <label class="field-label" for="bf-submit-label">Button text</label>
+            <input class="input" id="bf-submit-label" value="${escapeHtml(state.builderSubmitLabel)}" placeholder="Send enquiry" />
+          </div>
+          <div class="field-group" style="margin:0;">
+            <label class="field-label" for="bf-review-url">Google Review URL (optional)</label>
+            <input class="input" id="bf-review-url" type="url" value="${escapeHtml(state.builderReviewGateUrl)}" placeholder="https://g.page/r/your-business/review" />
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border-subtle);">
           <div class="filter-pills">
             ${Object.entries(ENQUIRY_TEMPLATES)
               .map(([key, tpl]) => `<button type="button" class="filter-pill" data-apply-template="${key}">${tpl.label}</button>`)
               .join('')}
           </div>
-        </div>
-
-        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
-          ${fieldCards}
-        </div>
-
-        <div class="field-group" style="margin-bottom:14px;">
-          <label class="field-label" for="bf-submit-label">Submit button label</label>
-          <input class="input" id="bf-submit-label" value="${escapeHtml(state.builderSubmitLabel)}" placeholder="Send enquiry" />
-        </div>
-
-        <div class="toggle-row" style="border-top:1px solid var(--border-subtle);padding:12px 0;">
-          <div>
-            <div class="cell-primary" style="font-size:13px;">Multi-step quote flow</div>
-            <div class="cell-secondary">Splits longer forms into 2 progressive steps to lift completion.</div>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="bf-multi-step" ${state.builderMultiStep ? 'checked' : ''} />
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-
-        <div class="field-group" style="margin-top:12px;margin-bottom:16px;">
-          <label class="field-label" for="bf-review-url">Smart Review Gate — Google Review URL (optional)</label>
-          <input class="input" id="bf-review-url" type="url" value="${escapeHtml(state.builderReviewGateUrl)}" placeholder="https://g.page/r/your-business/review" />
-          <div class="field-hint">When set, visitors rate 1–5 stars first: 4–5 stars go to Google Reviews; 1–3 stars open this private feedback form.</div>
-        </div>
-
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-          <button type="button" class="btn btn-secondary btn-sm" data-bf-add="1">${icons.plus} Add field</button>
-          <button type="button" class="btn btn-primary btn-sm" data-bf-save="1">Save & update embed</button>
+          <button type="button" class="btn btn-primary btn-sm" data-bf-save="1">Save Form</button>
         </div>
       </div>
 
       <div class="card card-padded" style="position:sticky;top:84px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
-          <h2 class="section-title" style="margin:0;">Live embedded form</h2>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+          <h2 class="section-title" style="margin:0;">Live Form Preview</h2>
           <div class="toolbar-group">
-            <a class="btn btn-secondary btn-sm" href="/embed/${encodeURIComponent(f.id)}" target="_blank" rel="noopener">Open Embed ${icons.external}</a>
-            <button type="button" class="btn btn-secondary btn-sm" data-form-tab="integration">Get Embed Code</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-test-popout="${escapeHtml(f.id)}" data-test-mode="popover">Test Pop-Out</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-form-tab="integration">Get Code</button>
           </div>
         </div>
         <div style="background:var(--bg-canvas);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px;min-height:460px;">
-          <iframe class="embed-preview-frame" style="width:100%;min-height:460px;border:0;background:#ffffff;border-radius:10px;" srcdoc="${escapeHtml(buildLiveFormPreviewDoc(f, state.builderFields))}" title="Embedded enquiry form preview"></iframe>
+          <iframe id="bf-live-preview-iframe" class="embed-preview-frame" style="width:100%;min-height:460px;border:0;background:#ffffff;border-radius:10px;" srcdoc="${escapeHtml(buildLiveFormPreviewDoc(f, state.builderFields))}" title="Embedded enquiry form preview"></iframe>
         </div>
       </div>
     </div>
@@ -1110,38 +1145,11 @@ function getIntegrationSnippet(f, lang) {
   const accent = state.workspace?.accent_color || '#14383e';
 
   if (lang === 'popout') {
-    return `<!-- 1. Drop once before </body> on any site (Webflow, WordPress, Squarespace, Shopify, HTML) -->
-<!-- Zero setup required: renders a ${state.popoutMode === 'popover' ? 'Floating Chat Window' : 'Slide-Over Cart Drawer'} + floating launcher button -->
-<script
-  src="${widgetUrl}"
-  data-form="${f.id}"
-  data-mode="${state.popoutMode}"
-  data-label="${label}"
-  data-title="${f.name}"
-  data-accent="${accent}"
-  defer
-></script>
-
-<!-- 2. Optional: Any existing button or link on their site can also trigger the popout -->
-<a href="#askforms-${f.id}">${label}</a>`;
+    return `<script src="${widgetUrl}" data-form="${f.id}" data-mode="${state.popoutMode}" data-label="${label}" data-title="${f.name}" data-accent="${accent}" defer></script>`;
   }
 
   if (lang === 'embed') {
-    return `<!-- Drop onto any website (Webflow, Squarespace, WordPress, Shopify, HTML) -->
-<iframe
-  id="formflow-${f.id}"
-  src="${embedUrl}"
-  title="${f.name}"
-  style="width:100%;min-height:480px;border:0;background:transparent;"
-  loading="lazy"
-></iframe>
-<script>
-  window.addEventListener('message', function (e) {
-    if (e.data && e.data.type === 'formflow:resize' && e.data.formId === '${f.id}') {
-      document.getElementById('formflow-${f.id}').style.height = (e.data.height + 16) + 'px';
-    }
-  });
-</script>`;
+    return `<iframe id="askforms-${f.id}" src="${embedUrl}" title="${f.name}" style="width:100%;min-height:520px;border:0;background:transparent;" loading="lazy"></iframe>`;
   }
 
   if (lang === 'html') {
@@ -1268,19 +1276,23 @@ function renderFormIntegrationTab(f) {
       <div style="display:flex;flex-direction:column;gap:22px;min-width:0;">
         <div class="card">
           <div class="card-section-header">
-            <h2 class="card-section-label">Form Endpoint & Popout Preview</h2>
+            <h2 class="card-section-label">Test Your Form</h2>
             <div class="toolbar-group">
-              <button type="button" class="btn btn-primary btn-sm" data-test-popout="${escapeHtml(f.id)}" data-test-mode="drawer">${icons.popout} Test Slide-Over Drawer</button>
-              <button type="button" class="btn btn-secondary btn-sm" data-test-popout="${escapeHtml(f.id)}" data-test-mode="popover">Test Chat Popout</button>
-              <a class="btn btn-secondary btn-sm" href="/embed/${encodeURIComponent(f.id)}" target="_blank" rel="noopener">Inline ${icons.external}</a>
+              <button type="button" class="btn btn-primary btn-sm" data-test-popout="${escapeHtml(f.id)}" data-test-mode="popover">${icons.popout} Chat Pop-Out</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-test-popout="${escapeHtml(f.id)}" data-test-mode="drawer">Slide-Over Drawer</button>
+              ${
+                isDemoMode()
+                  ? `<button type="button" class="btn btn-secondary btn-sm" data-open-inline-preview="${escapeHtml(f.id)}">Inline Preview</button>`
+                  : `<a class="btn btn-secondary btn-sm" href="/embed/${encodeURIComponent(f.id)}" target="_blank" rel="noopener">Inline ${icons.external}</a>`
+              }
             </div>
           </div>
           <div class="card-padded">
+            <p class="cell-secondary" style="margin:0 0 10px;font-size:13px;">Choose <strong>one</strong> embed option below and paste it into your website. You do not need to use multiple tabs.</p>
             <div class="endpoint-box">
-              <span><strong style="color:var(--accent);font-weight:700;">POST</strong> ${escapeHtml(endpoint)}</span>
-              <button class="btn btn-secondary btn-sm" data-copy="${escapeHtml(endpoint)}">${icons.copy} Copy</button>
+              <span><strong style="color:var(--accent);font-weight:700;">Form Link</strong> ${escapeHtml(`${state.baseUrl}/embed/${f.id}`)}</span>
+              <button class="btn btn-secondary btn-sm" data-copy="${escapeHtml(`${state.baseUrl}/embed/${f.id}`)}">${icons.copy} Copy</button>
             </div>
-            <div class="field-hint" style="margin-top:10px;">Zero-setup popout widget works on any website with a single <span class="mono">&lt;script&gt;</span> tag, or point any HTML <span class="mono">&lt;form&gt;</span> / <span class="mono">fetch()</span> directly to this URL.</div>
           </div>
         </div>
 
@@ -2438,6 +2450,111 @@ function openDeployModal() {
   `;
 }
 
+function openCheckoutDrawer() {
+  els.drawer.classList.remove('hidden');
+  els.drawerBackdrop.classList.remove('hidden');
+  els.drawer.setAttribute('aria-hidden', 'false');
+
+  els.drawer.innerHTML = `
+    <div class="drawer-header" style="background:var(--accent);color:var(--accent-text);border-bottom:0;">
+      <div>
+        <strong style="font-size:15.5px;display:block;">Buy AskForms Lifetime License</strong>
+        <span style="font-size:12px;opacity:0.8;">Pay once · Zero monthly fees · Unlimited forms</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" style="color:var(--accent-text);" data-action="close-drawer" aria-label="Close">${icons.close}</button>
+    </div>
+
+    <form id="inapp-checkout-form" class="drawer-body" style="display:flex;flex-direction:column;gap:16px;">
+      <div style="padding:14px 16px;border-radius:12px;background:var(--bg-canvas);border:1px solid var(--border-subtle);display:flex;align-items:baseline;justify-content:space-between;">
+        <div>
+          <div style="font-weight:700;font-size:14.5px;color:var(--ink-primary);">Single-Website License</div>
+          <div class="cell-secondary" style="font-size:12.5px;">Includes Form Builder, AI Assistant &amp; 12 Alert Channels</div>
+        </div>
+        <div style="font-size:22px;font-weight:800;color:var(--accent);white-space:nowrap;">$149 <span style="font-size:12px;font-weight:600;color:var(--ink-muted);">AUD</span></div>
+      </div>
+
+      <div class="field-group" style="margin:0;">
+        <label class="field-label" for="inapp-domain">Website domain to license</label>
+        <input class="input mono" id="inapp-domain" name="domain" placeholder="yourbusiness.com.au" required />
+      </div>
+
+      <div class="field-group" style="margin:0;">
+        <label class="field-label" for="inapp-holder">Business name</label>
+        <input class="input" id="inapp-holder" name="holder" placeholder="Harbour Plumbing Co" required />
+      </div>
+
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);cursor:pointer;background:#ffffff;">
+        <input type="checkbox" id="inapp-partner-setup" name="includePartnerSetup" style="margin-top:3px;width:16px;height:16px;accent-color:var(--accent);" />
+        <span style="font-size:13px;line-height:1.45;color:var(--ink-primary);">
+          <strong>Add TeaGee Labs Setup &amp; Hosting (+$99 AUD)</strong><br />
+          <span style="color:var(--ink-muted);font-size:12px;">We deploy, host, and connect AskForms to your site for you.</span>
+        </span>
+      </label>
+
+      <button type="submit" class="btn btn-primary" id="inapp-checkout-btn" style="width:100%;height:44px;">
+        Continue to Stripe · $149 AUD
+      </button>
+
+      <div class="cell-secondary" style="font-size:12px;text-align:center;">
+        Your license key is emailed immediately after payment.
+      </div>
+    </form>
+  `;
+
+  document.getElementById('inapp-domain')?.focus();
+}
+
+function openInlinePreviewModal(formId) {
+  const form = state.forms.find((f) => f.id === formId) || state.currentForm;
+  if (!form) return;
+  const fields = form.id === state.selectedFormId ? state.builderFields : form.fields;
+  els.modal.classList.remove('hidden');
+  els.modalBackdrop.classList.remove('hidden');
+  els.modal.innerHTML = `
+    <div class="drawer-header">
+      <strong>${escapeHtml(form.name || 'Inline Form Preview')}</strong>
+      <button class="btn btn-ghost btn-sm" data-action="close-modal" aria-label="Close">${icons.close}</button>
+    </div>
+    <div class="modal-body" style="padding:10px;">
+      <iframe style="width:100%;min-height:480px;border:0;background:#ffffff;border-radius:10px;" srcdoc="${escapeHtml(buildLiveFormPreviewDoc(form, fields))}" title="Inline form preview"></iframe>
+    </div>
+  `;
+}
+
+function addBuilderFieldOfType(type) {
+  const defaults = {
+    text: { label: 'Short question', placeholder: 'Type answer...' },
+    email: { label: 'Email address', placeholder: 'you@example.com.au' },
+    tel: { label: 'Mobile number', placeholder: '0412 345 678' },
+    select: { label: 'Choose an option', options: ['Option 1', 'Option 2', 'Option 3'] },
+    checklist: { label: 'Select all that apply', options: ['Service A', 'Service B', 'Service C'] },
+    checkbox: { label: 'I agree to be contacted' },
+    textarea: { label: 'Details', placeholder: 'Tell us more...' },
+    date: { label: 'Preferred date' },
+    file: { label: 'Upload a photo or file' },
+  };
+  const d = defaults[type] || defaults.text;
+  const idx = state.builderFields.length + 1;
+  state.builderFields.push({
+    name: `${type}_${idx}`,
+    label: d.label,
+    type,
+    placeholder: d.placeholder || '',
+    options: d.options ? [...d.options] : undefined,
+    required: type === 'email' || type === 'text',
+    half: false,
+  });
+  state.selectedFieldIdx = state.builderFields.length - 1;
+  render();
+}
+
+function refreshBuilderPreviewIframe() {
+  const iframe = document.getElementById('bf-live-preview-iframe');
+  if (iframe && state.currentForm) {
+    iframe.setAttribute('srcdoc', buildLiveFormPreviewDoc(state.currentForm, state.builderFields));
+  }
+}
+
 function closeModal() {
   els.modal.classList.add('hidden');
   els.modalBackdrop.classList.add('hidden');
@@ -2738,23 +2855,14 @@ const PLATFORM_INSTRUCTIONS = {
 
 function getPlatformEmbedSnippet(platform, formId, formName, accent) {
   const safeName = formName || 'Website Enquiry';
-  const scriptTag = `<script src="${state.baseUrl}/widget.js" data-form="${formId}" data-mode="${state.popoutMode || 'drawer'}" data-label="Get a Quote" data-title="${safeName}" data-accent="${accent}" defer></script>`;
+  const scriptTag = `<script src="${state.baseUrl}/widget.js" data-form="${formId}" data-mode="${state.popoutMode || 'popover'}" data-label="Get a Quote" data-title="${safeName}" data-accent="${accent}" defer></script>`;
   if (platform === 'wix') {
-    return `<!-- Wix Embed HTML Block (inline form) -->\n<iframe src="${state.baseUrl}/embed/${formId}" title="${safeName}" style="width:100%;min-height:540px;border:0;background:transparent;" loading="lazy"></iframe>`;
+    return `<iframe src="${state.baseUrl}/embed/${formId}" title="${safeName}" style="width:100%;min-height:540px;border:0;background:transparent;" loading="lazy"></iframe>`;
   }
   if (platform === 'wordpress') {
-    return `<!-- WordPress Custom HTML Block (or Footer Code) -->\n${scriptTag}\n<a href="#askforms-${formId}" class="wp-block-button__link">Get a Quote</a>`;
+    return `${scriptTag}\n<a href="#askforms-${formId}" class="wp-block-button__link">Get a Quote</a>`;
   }
-  if (platform === 'shopify') {
-    return `<!-- Paste before </body> in theme.liquid -->\n${scriptTag}\n<!-- Optional: link any Shopify button to #askforms-${formId} -->`;
-  }
-  if (platform === 'squarespace') {
-    return `<!-- Squarespace Code Injection (Footer) -->\n${scriptTag}\n<!-- Link any Squarespace button URL to: #askforms-${formId} -->`;
-  }
-  if (platform === 'webflow') {
-    return `<!-- Webflow Site Settings → Custom Code → Footer -->\n${scriptTag}\n<!-- Set any Webflow Button link URL to: #askforms-${formId} -->`;
-  }
-  return `<!-- Paste before </body> on any website -->\n${scriptTag}\n<a href="#askforms-${formId}">Get a Quote</a>`;
+  return scriptTag;
 }
 
 function buildWizardLivePreviewHtml() {
@@ -3007,7 +3115,8 @@ function renderSetupWizardView() {
             </div>
           `
           : `
-            <div style="margin-bottom:14px;">
+            <p class="cell-secondary" style="margin:0 0 10px;font-size:13px;"><strong>Pick your website platform below</strong> (you only need one):</p>
+            <div style="margin-bottom:12px;">
               <div class="filter-pills">
                 ${Object.keys(PLATFORM_INSTRUCTIONS)
                   .map((p) => {
@@ -3188,7 +3297,7 @@ function renderAiWidget() {
   els.aiFabRoot.innerHTML = `
     ${popupHtml}
     <button type="button" class="ai-fab-btn ${state.aiChatOpen ? 'is-open' : ''}" data-action="toggle-ai-chat" aria-label="${state.aiChatOpen ? 'Close AI chat' : 'Build with AI'}">
-      ${state.aiChatOpen ? closeSvg : `<span class="ai-fab-dot"></span>${sparkleSvg}<span>Build with AI</span>`}
+      ${state.aiChatOpen ? closeSvg : `<span class="ai-fab-dot"></span><span>Build with AI</span>`}
     </button>
   `;
 
@@ -3586,6 +3695,51 @@ document.addEventListener('click', async (e) => {
     const wrap = document.querySelector('.project-heading-wrap');
     wrap?.classList.remove('open');
     wrap?.querySelector('.heading-switcher')?.setAttribute('aria-expanded', 'false');
+  }
+
+  if (target.closest('[data-action="open-checkout-drawer"]')) {
+    openCheckoutDrawer();
+    return;
+  }
+
+  const inlinePrevBtn = target.closest('[data-open-inline-preview]');
+  if (inlinePrevBtn) {
+    openInlinePreviewModal(inlinePrevBtn.dataset.openInlinePreview);
+    return;
+  }
+
+  const dndAddBtn = target.closest('[data-dnd-add]');
+  if (dndAddBtn) {
+    addBuilderFieldOfType(dndAddBtn.dataset.dndAdd);
+    return;
+  }
+
+  const toggleHalfBtn = target.closest('[data-bf-toggle-half]');
+  if (toggleHalfBtn) {
+    const idx = Number(toggleHalfBtn.dataset.bfToggleHalf);
+    if (state.builderFields[idx]) {
+      state.builderFields[idx].half = !state.builderFields[idx].half;
+      render();
+    }
+    return;
+  }
+
+  const toggleReqBtn = target.closest('[data-bf-toggle-req]');
+  if (toggleReqBtn) {
+    const idx = Number(toggleReqBtn.dataset.bfToggleReq);
+    if (state.builderFields[idx]) {
+      state.builderFields[idx].required = !state.builderFields[idx].required;
+      render();
+    }
+    return;
+  }
+
+  const selectFieldCard = target.closest('[data-select-field]');
+  if (selectFieldCard && !target.closest('[data-stop-prop]')) {
+    const idx = Number(selectFieldCard.dataset.selectField);
+    state.selectedFieldIdx = state.selectedFieldIdx === idx ? -1 : idx;
+    render();
+    return;
   }
 
   if (target.closest('[data-action="toggle-ai-chat"]')) {
@@ -4636,6 +4790,11 @@ document.addEventListener('change', async (e) => {
     state.builderMultiStep = e.target.checked;
     return;
   }
+  if (e.target.id === 'inapp-partner-setup') {
+    const btn = document.getElementById('inapp-checkout-btn');
+    if (btn) btn.textContent = e.target.checked ? 'Continue to Stripe · $248 AUD' : 'Continue to Stripe · $149 AUD';
+    return;
+  }
   if (e.target.id === 'wiz-accent-pick') {
     const inp = document.getElementById('wiz-accent');
     if (inp) inp.value = e.target.value;
@@ -4718,6 +4877,38 @@ document.addEventListener('change', async (e) => {
 // Form submissions
 document.addEventListener('submit', async (e) => {
   const form = e.target;
+
+  if (form.id === 'inapp-checkout-form') {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const btn = document.getElementById('inapp-checkout-btn');
+    const orig = btn?.textContent || 'Continue to Stripe';
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Opening Stripe...';
+    }
+    try {
+      const res = await fetch('/api/license/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domain: fd.get('domain'),
+          holder: fd.get('holder'),
+          includePartnerSetup: Boolean(document.getElementById('inapp-partner-setup')?.checked),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.checkoutUrl) throw new Error(data.error || 'Unable to start Stripe Checkout');
+      window.location.href = data.checkoutUrl;
+    } catch (err) {
+      showToast(err.message);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = orig;
+      }
+    }
+    return;
+  }
 
   if (form.id === 'assistant-chat-form') {
     e.preventDefault();
@@ -5015,6 +5206,29 @@ document.addEventListener('input', (e) => {
     if (state.routingRules[idx]) state.routingRules[idx][prop] = e.target.value;
     return;
   }
+  if (e.target.matches('[data-bf-prop]') || e.target.id === 'bf-submit-label') {
+    if (e.target.id === 'bf-submit-label') {
+      state.builderSubmitLabel = e.target.value;
+    } else {
+      const idx = Number(e.target.dataset.bfIdx);
+      const prop = e.target.dataset.bfProp;
+      const fld = state.builderFields[idx];
+      if (fld) {
+        if (prop === 'options') {
+          fld.options = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+        } else if (prop !== 'required' && prop !== 'half') {
+          fld[prop] = e.target.value;
+          if (prop === 'label') {
+            fld.name = e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || `field_${idx + 1}`;
+            const labelEl = e.target.closest('.dnd-field-card')?.querySelector('.dnd-card-label');
+            if (labelEl) labelEl.textContent = e.target.value || 'Untitled field';
+          }
+        }
+      }
+    }
+    refreshBuilderPreviewIframe();
+    return;
+  }
   if (['wiz-brand', 'wiz-accent', 'wiz-email', 'wiz-fname'].includes(e.target.id)) {
     if (e.target.id === 'wiz-brand') state.setupData.brand_name = e.target.value;
     if (e.target.id === 'wiz-accent' && /^#[0-9a-fA-F]{6}$/.test(e.target.value.trim())) {
@@ -5027,6 +5241,73 @@ document.addEventListener('input', (e) => {
     const card = document.getElementById('wiz-live-preview-card');
     if (card) card.innerHTML = buildWizardLivePreviewHtml();
   }
+});
+
+// HTML5 Drag & Drop for Interactive Form Builder
+let dndDragState = { mode: null, fromIdx: -1, addType: null };
+
+document.addEventListener('dragstart', (e) => {
+  const chip = e.target.closest('[data-dnd-add]');
+  if (chip) {
+    dndDragState = { mode: 'add', fromIdx: -1, addType: chip.dataset.dndAdd };
+    e.dataTransfer.effectAllowed = 'copy';
+    return;
+  }
+  const card = e.target.closest('[data-dnd-idx]');
+  if (card) {
+    dndDragState = { mode: 'move', fromIdx: Number(card.dataset.dndIdx), addType: null };
+    card.classList.add('is-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  }
+});
+
+document.addEventListener('dragover', (e) => {
+  if (!dndDragState.mode) return;
+  const card = e.target.closest('[data-dnd-idx]');
+  const canvas = e.target.closest('#dnd-canvas-grid');
+  if (card || canvas) {
+    e.preventDefault();
+    document.querySelectorAll('.dnd-field-card.is-over').forEach((el) => el.classList.remove('is-over'));
+    if (card) card.classList.add('is-over');
+  }
+});
+
+document.addEventListener('drop', (e) => {
+  if (!dndDragState.mode) return;
+  const card = e.target.closest('[data-dnd-idx]');
+  const canvas = e.target.closest('#dnd-canvas-grid');
+  if (!card && !canvas) return;
+  e.preventDefault();
+  document.querySelectorAll('.dnd-field-card.is-over,.dnd-field-card.is-dragging').forEach((el) => {
+    el.classList.remove('is-over', 'is-dragging');
+  });
+
+  if (dndDragState.mode === 'add' && dndDragState.addType) {
+    const insertAt = card ? Number(card.dataset.dndIdx) : state.builderFields.length;
+    addBuilderFieldOfType(dndDragState.addType);
+    if (insertAt < state.builderFields.length - 1) {
+      const [added] = state.builderFields.splice(state.builderFields.length - 1, 1);
+      state.builderFields.splice(insertAt, 0, added);
+      state.selectedFieldIdx = insertAt;
+      render();
+    }
+  } else if (dndDragState.mode === 'move' && card && dndDragState.fromIdx >= 0) {
+    const toIdx = Number(card.dataset.dndIdx);
+    if (toIdx !== dndDragState.fromIdx) {
+      const [moved] = state.builderFields.splice(dndDragState.fromIdx, 1);
+      state.builderFields.splice(toIdx, 0, moved);
+      state.selectedFieldIdx = toIdx;
+      render();
+    }
+  }
+  dndDragState = { mode: null, fromIdx: -1, addType: null };
+});
+
+document.addEventListener('dragend', () => {
+  document.querySelectorAll('.dnd-field-card.is-over,.dnd-field-card.is-dragging').forEach((el) => {
+    el.classList.remove('is-over', 'is-dragging');
+  });
+  dndDragState = { mode: null, fromIdx: -1, addType: null };
 });
 
 // Keyboard shortcuts

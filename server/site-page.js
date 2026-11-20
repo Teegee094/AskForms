@@ -1919,7 +1919,7 @@ export function renderCommercialSitePage(workspace = {}, defaultFormId = 'templa
     if (marqueeViewport && marqueeTrack && marqueeTrack.getAnimations) {
       marqueeViewport.addEventListener('mouseenter', () => {
         const anim = marqueeTrack.getAnimations()[0];
-        if (anim) anim.playbackRate = 0.25;
+        if (anim) anim.playbackRate = 0.6;
       });
       marqueeViewport.addEventListener('mouseleave', () => {
         const anim = marqueeTrack.getAnimations()[0];
