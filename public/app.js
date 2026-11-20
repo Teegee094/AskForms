@@ -44,24 +44,24 @@ const state = {
   builderMultiStep: false,
   builderReviewGateUrl: '',
   embedVersion: 1,
-  wfOpen: { validations: false, response: false, actions: true },
+  wfOpen: { validations: false, response: false, actions: true, routing: true },
   wfEmailEditorOpen: false,
+  routingRules: [],
   aiPromptExpanded: false,
   selectedSubIds: [],
   setupStep: 1,
   setupData: {
     brand_name: '',
     website_url: '',
-    accent_color: '#095c4f',
-    font_preset: 'editorial',
+    accent_color: '#14383e',
+    font_preset: 'minimal',
     radius_preset: 'balanced',
     owner_email: '',
-    owner_pin: '246810',
-    alert_format: 'telegram',
-    alert_url: '',
+    alert_channel: '',
+    alert_value: '',
+    alert_extra: '',
     form_name: 'Website Enquiry',
     template: 'trades',
-    multi_step: true,
     review_gate_url: '',
     created_form_id: '',
   },
@@ -254,6 +254,7 @@ async function loadFormDetail(formId) {
   ]);
   state.currentForm = detail.form;
   state.builderFields = JSON.parse(JSON.stringify(detail.form.fields || []));
+  state.routingRules = JSON.parse(JSON.stringify(detail.form.routing_rules || []));
   state.builderSubmitLabel = detail.form.submit_label || 'Send enquiry';
   state.builderMultiStep = Boolean(detail.form.multi_step);
   state.builderReviewGateUrl = detail.form.review_gate_url || '';
@@ -325,8 +326,7 @@ function renderTopbar() {
       <div class="header-right">
         <nav class="header-nav" aria-label="Preview Primary">
           <button class="header-nav-link ${state.view === 'forms' || state.view === 'form' ? 'active' : ''}" data-nav="forms">Forms</button>
-          <button class="header-nav-link ${state.view === 'channels' ? 'active' : ''}" data-nav="channels">Notifications</button>
-          <button class="header-nav-link ${state.view === 'workspace' ? 'active' : ''}" data-nav="workspace">Brand</button>
+          <button class="header-nav-link ${state.view === 'workspace' || state.view === 'channels' || state.view === 'setup' ? 'active' : ''}" data-nav="channels">Settings</button>
         </nav>
         <button type="button" class="btn btn-ghost btn-sm" data-action="reset-demo-studio" title="Clear preview session">Reset</button>
         <a class="btn btn-primary btn-sm" href="/#pricing">Buy License · $149</a>
@@ -341,9 +341,8 @@ function renderTopbar() {
     <div class="header-right">
       <nav class="header-nav" aria-label="Primary">
         <button class="header-nav-link ${state.view === 'forms' || state.view === 'form' ? 'active' : ''}" data-nav="forms">Forms</button>
-        <button class="header-nav-link ${state.view === 'channels' ? 'active' : ''}" data-nav="channels">Notifications</button>
         <button class="header-nav-link ${state.view === 'mail' || state.view === 'webhooks' ? 'active' : ''}" data-nav="mail">Activity</button>
-        <button class="header-nav-link ${state.view === 'workspace' || state.view === 'setup' ? 'active' : ''}" data-nav="workspace">Brand</button>
+        <button class="header-nav-link ${state.view === 'workspace' || state.view === 'channels' || state.view === 'setup' ? 'active' : ''}" data-nav="channels">Settings</button>
       </nav>
       ${
         impersonatedBy
@@ -1480,6 +1479,68 @@ function renderFormWorkflowsTab(f) {
             </div>
           </div>
         </div>
+
+        <!-- Step 4: Conditional Routing -->
+        <div class="wf-step ${state.wfOpen.routing ? 'open' : ''}">
+          <div class="wf-rail"><span class="wf-node"></span></div>
+          <div class="wf-card">
+            <button type="button" class="wf-card-head" data-wf-toggle="routing">
+              <span class="wf-head-left">
+                <span class="wf-icon-badge">${icons.send}</span>
+                <span class="wf-title">Conditional Routing</span>
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <span class="tag ${(state.routingRules || []).length > 0 ? 'tag-accent' : ''}">${(state.routingRules || []).length} ${(state.routingRules || []).length === 1 ? 'rule' : 'rules'}</span>
+                <span class="wf-chevron">${icons.chevron}</span>
+              </span>
+            </button>
+            <div class="wf-body">
+              <p class="cell-secondary" style="margin:0 0 14px;font-size:13px;">
+                Automatically send enquiries to a specific team email or webhook URL based on what the visitor selects (for example, route <strong>Emergency Repair</strong> straight to your on-call technician).
+              </p>
+              <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;">
+                ${
+                  (state.routingRules || []).length === 0
+                    ? `<div style="padding:14px 16px;border-radius:10px;border:1px dashed var(--border);color:var(--ink-muted);font-size:13px;">No conditional rules yet. Click <strong>+ Add Rule</strong> below to route specific services or answers.</div>`
+                    : (state.routingRules || [])
+                        .map((rule, idx) => {
+                          const fieldOpts = (f.fields || [])
+                            .map((fld) => `<option value="${escapeHtml(fld.name)}" ${rule.field === fld.name ? 'selected' : ''}>${escapeHtml(fld.label || fld.name)}</option>`)
+                            .join('');
+                          const matchedField = (f.fields || []).find((fld) => fld.name === rule.field);
+                          const suggestedVals = Array.isArray(matchedField?.options) ? matchedField.options : [];
+                          return `
+                            <div style="display:grid;grid-template-columns:1.1fr 0.7fr 1.1fr 1.4fr auto;gap:8px;align-items:center;padding:10px 12px;border-radius:10px;background:var(--bg-canvas);border:1px solid var(--border-subtle);">
+                              <select class="select" data-route-prop="field" data-route-idx="${idx}" aria-label="If field">
+                                ${fieldOpts}
+                              </select>
+                              <select class="select" data-route-prop="match" data-route-idx="${idx}" aria-label="Condition">
+                                <option value="equals" ${rule.match !== 'contains' ? 'selected' : ''}>is</option>
+                                <option value="contains" ${rule.match === 'contains' ? 'selected' : ''}>contains</option>
+                              </select>
+                              ${
+                                suggestedVals.length > 0 && rule.match !== 'contains'
+                                  ? `<select class="select" data-route-prop="value" data-route-idx="${idx}" aria-label="Value">
+                                       <option value="">Select choice...</option>
+                                       ${suggestedVals.map((v) => `<option value="${escapeHtml(v)}" ${rule.value === v ? 'selected' : ''}>${escapeHtml(v)}</option>`).join('')}
+                                     </select>`
+                                  : `<input class="input" data-route-prop="value" data-route-idx="${idx}" value="${escapeHtml(rule.value || '')}" placeholder="e.g. Emergency Repair" />`
+                              }
+                              <input class="input" data-route-prop="target" data-route-idx="${idx}" value="${escapeHtml(rule.target || '')}" placeholder="team@domain.com.au or https://..." />
+                              <button type="button" class="btn btn-ghost btn-sm" style="padding:0 8px;color:var(--danger);" data-route-remove="${idx}" title="Remove rule">${icons.trash}</button>
+                            </div>
+                          `;
+                        })
+                        .join('')
+                }
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-secondary btn-sm" data-action="add-routing-rule">${icons.plus} Add Rule</button>
+                <button type="button" class="btn btn-primary btn-sm" data-action="save-routing-rules">Save Routing Rules</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -2342,8 +2403,9 @@ function renderWorkspaceView() {
         </div>
 
         <div class="underline-tabs" role="tablist">
-          <button class="underline-tab active" data-nav="workspace">Brand & Hosting</button>
-          <button class="underline-tab" data-nav="setup">Setup Wizard</button>
+          <button class="underline-tab" data-nav="channels">Notifications</button>
+          <button class="underline-tab active" data-nav="workspace">Brand &amp; Hosting</button>
+          ${isDemoMode() ? '' : `<button class="underline-tab" data-nav="setup">Setup Wizard</button>`}
         </div>
       </div>
     </div>
@@ -2668,43 +2730,154 @@ function renderWorkspaceView() {
 // ============================================================
 // VIEW: 4-STEP DESIGNER SETUP WIZARD (/setup)
 // ============================================================
-const PLATFORM_INSTRUCTIONS = {
-  webflow: 'In Webflow Designer, drag an Embed element onto your Contact or Quote section and paste this code.',
-  wordpress: 'In WordPress (Gutenberg, Elementor, or Bricks), add a Custom HTML block and paste this code.',
-  squarespace: 'In Squarespace, add a Code Block (HTML mode) on your contact page and paste this code.',
-  wix: 'In Wix Studio or Editor, add an Embed HTML element and paste this code.',
-  html: 'Paste directly inside any <section> on your static HTML, Astro, or Cloudflare Pages site.',
+const CHANNEL_LOGOS = {
+  email_resend: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="16" rx="3" fill="#14383E"/><path d="M3 6.5L12 13L21 6.5" stroke="#4FD1C5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  ntfy: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="16" rx="4" fill="#317F6F"/><path d="M7 9.5L10.5 12L7 14.5M12.5 14.5H17" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  telegram: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10.5" fill="#229ED9"/><path d="M16.9 7.8L15.1 16.3C14.96 16.92 14.6 17.07 14.1 16.78L11.35 14.75L10.02 16.03C9.87 16.18 9.75 16.3 9.46 16.3L9.66 13.5L14.75 8.9C14.97 8.7 14.7 8.6 14.41 8.8L8.12 12.76L5.41 11.91C4.82 11.73 4.81 11.32 5.53 11.04L16.12 6.96C16.61 6.78 17.04 7.08 16.9 7.8Z" fill="#FFFFFF"/></svg>`,
+  discord: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="5" fill="#5865F2"/><path d="M16.2 8.2C15.3 7.8 14.4 7.5 13.4 7.3L13.1 8C12.4 7.9 11.6 7.9 10.9 8L10.6 7.3C9.6 7.5 8.7 7.8 7.8 8.2C6 10.9 5.5 13.5 5.8 16.1C6.9 16.9 8 17.4 9.2 17.8L9.9 16.7C9.5 16.5 9.1 16.3 8.8 16.1L9.1 15.8C10.9 16.6 13.1 16.6 14.9 15.8L15.2 16.1C14.9 16.3 14.5 16.5 14.1 16.7L14.8 17.8C16 17.4 17.1 16.9 18.2 16.1C18.5 13.1 17.7 10.5 16.2 8.2ZM9.9 14.5C9.2 14.5 8.7 13.9 8.7 13.1C8.7 12.4 9.2 11.8 9.9 11.8C10.6 11.8 11.1 12.4 11.1 13.1C11.1 13.9 10.6 14.5 9.9 14.5ZM14.1 14.5C13.4 14.5 12.9 13.9 12.9 13.1C12.9 12.4 13.4 11.8 14.1 11.8C14.8 11.8 15.3 12.4 15.3 13.1C15.3 13.9 14.8 14.5 14.1 14.5Z" fill="#FFFFFF"/></svg>`,
+  slack: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="10.2" y="3" width="3.2" height="7.5" rx="1.6" fill="#36C5F0"/><circle cx="7.4" cy="8.9" r="1.6" fill="#36C5F0"/><rect x="13.5" y="10.2" width="7.5" height="3.2" rx="1.6" fill="#2EB67D"/><circle cx="15.1" cy="7.4" r="1.6" fill="#2EB67D"/><rect x="10.6" y="13.5" width="3.2" height="7.5" rx="1.6" fill="#ECB22E"/><circle cx="16.6" cy="15.1" r="1.6" fill="#ECB22E"/><rect x="3" y="10.6" width="7.5" height="3.2" rx="1.6" fill="#E01E5A"/><circle cx="8.9" cy="16.6" r="1.6" fill="#E01E5A"/></svg>`,
+  whatsapp: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10.5" fill="#25D366"/><path d="M16.5 14.7C16.2 15.4 15.2 16 14.4 16.1C13.8 16.2 13 16.2 10.6 15.2C7.8 14 6.1 11.1 5.9 10.9C5.8 10.7 4.9 9.5 4.9 8.2C4.9 7 5.5 6.4 5.8 6.1C6 5.9 6.3 5.8 6.6 5.8H7.2C7.4 5.8 7.7 5.8 7.9 6.4C8.2 7 8.8 8.5 8.9 8.6C9 8.8 9 9 8.9 9.2C8.8 9.4 8.7 9.6 8.5 9.8L8.1 10.2C8 10.4 7.8 10.6 8 10.9C8.2 11.2 8.8 12.2 9.8 13C11 14 12 14.3 12.3 14.5C12.6 14.6 12.8 14.6 13 14.3L13.7 13.5C13.9 13.2 14.1 13.3 14.4 13.4L16.3 14.3C16.6 14.4 16.7 14.5 16.5 14.7Z" fill="#FFFFFF"/></svg>`,
+  teams: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="4" fill="#5059C9"/><path d="M8.5 9H15.5V10.8H12.9V16.5H11.1V10.8H8.5V9Z" fill="#FFFFFF"/></svg>`,
+  google_chat: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="14" rx="3.5" fill="#00AC47"/><path d="M7 18L4 21V16H7V18Z" fill="#00832D"/><path d="M8 9.5H16M8 13H13.5" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"/></svg>`,
+  line: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="5" fill="#06C755"/><path d="M7 10V14H9.2M11 10V14M13 14V10L16 14V10" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  wechat: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="10" cy="11" r="6.5" fill="#07C160"/><circle cx="15.5" cy="14.5" r="5" fill="#2AAE67"/><circle cx="8.2" cy="10.2" r="1" fill="#FFFFFF"/><circle cx="11.8" cy="10.2" r="1" fill="#FFFFFF"/><circle cx="14.2" cy="14" r="0.85" fill="#FFFFFF"/><circle cx="16.8" cy="14" r="0.85" fill="#FFFFFF"/></svg>`,
+  gotify: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#1E88E5"/><path d="M12 7V12.5L15.5 14.5" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  custom_webhook: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="4" fill="#14383E"/><path d="M9 9L6 12L9 15M15 9L18 12L15 15M13 8L11 16" stroke="#4FD1C5" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 };
+
+const PLATFORM_INSTRUCTIONS = {
+  webflow: 'In Webflow, open Site Settings → Custom Code → Footer Code (before </body>), paste this snippet, and publish.',
+  wordpress: 'In WordPress (Gutenberg, Elementor, or Divi), add a Custom HTML block on your page or in your footer and paste this code.',
+  squarespace: 'In Squarespace, go to Website → Pages → Website Tools → Code Injection → Footer and paste this snippet.',
+  wix: 'In Wix Editor or Wix Studio, click Add (+) → Embed Code → Embed HTML, switch to Code mode, and paste this snippet.',
+  shopify: 'In Shopify Admin, go to Online Store → Themes → Edit Code → theme.liquid, paste right before </body>, and save.',
+  html: 'Paste right before the closing </body> tag on any HTML, Astro, Next.js, or Cloudflare Pages site.',
+};
+
+function getPlatformEmbedSnippet(platform, formId, formName, accent) {
+  const safeName = formName || 'Website Enquiry';
+  const scriptTag = `<script src="${state.baseUrl}/widget.js" data-form="${formId}" data-mode="${state.popoutMode || 'drawer'}" data-label="Get a Quote" data-title="${safeName}" data-accent="${accent}" defer></script>`;
+  if (platform === 'wix') {
+    return `<!-- Wix Embed HTML Block (inline form) -->\n<iframe src="${state.baseUrl}/embed/${formId}" title="${safeName}" style="width:100%;min-height:540px;border:0;background:transparent;" loading="lazy"></iframe>`;
+  }
+  if (platform === 'wordpress') {
+    return `<!-- WordPress Custom HTML Block (or Footer Code) -->\n${scriptTag}\n<a href="#askforms-${formId}" class="wp-block-button__link">Get a Quote</a>`;
+  }
+  if (platform === 'shopify') {
+    return `<!-- Paste before </body> in theme.liquid -->\n${scriptTag}\n<!-- Optional: link any Shopify button to #askforms-${formId} -->`;
+  }
+  if (platform === 'squarespace') {
+    return `<!-- Squarespace Code Injection (Footer) -->\n${scriptTag}\n<!-- Link any Squarespace button URL to: #askforms-${formId} -->`;
+  }
+  if (platform === 'webflow') {
+    return `<!-- Webflow Site Settings → Custom Code → Footer -->\n${scriptTag}\n<!-- Set any Webflow Button link URL to: #askforms-${formId} -->`;
+  }
+  return `<!-- Paste before </body> on any website -->\n${scriptTag}\n<a href="#askforms-${formId}">Get a Quote</a>`;
+}
+
+function buildWizardLivePreviewHtml() {
+  const d = state.setupData;
+  const ws = state.workspace || {};
+  const activeBrand = d.brand_name || ws.brand_name || 'Your Business';
+  const activeAccent = d.accent_color || ws.accent_color || '#14383e';
+  const accentText = contrastTextForHex(activeAccent);
+  const fontPreset = d.font_preset || ws.font_preset || 'minimal';
+  const radiusPreset = d.radius_preset || ws.radius_preset || 'balanced';
+  const fonts = FONT_TOKENS[fontPreset] || FONT_TOKENS.minimal;
+  const radii = RADIUS_TOKENS[radiusPreset] || RADIUS_TOKENS.balanced;
+  const tpl = ENQUIRY_TEMPLATES[d.template] || ENQUIRY_TEMPLATES.trades;
+  const previewFields = (tpl.fields || []).slice(0, 4);
+
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(230,255,250,0.72);">Live Brand &amp; Form Preview</div>
+      <span class="tag tag-accent">Step ${state.setupStep} of 4</span>
+    </div>
+
+    <div style="background:#ffffff;color:#0f172a;border-radius:${radii.lg};padding:20px;box-shadow:0 16px 40px -12px rgba(0,0,0,0.35);font-family:${fonts.sans};">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e2e8f0;">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:${escapeHtml(activeAccent)};">${escapeHtml(activeBrand)}</div>
+          <div style="font-family:${fonts.display};font-size:17px;font-weight:700;color:#0f172a;margin-top:2px;">${escapeHtml(d.form_name || 'Website Enquiry')}</div>
+        </div>
+        ${tpl.multiStep ? `<span style="font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:999px;background:#f1f5f9;color:#475569;white-space:nowrap;">2-Step Flow</span>` : ''}
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:14px;">
+        ${previewFields
+          .map(
+            (fld) => `
+              <div>
+                <div style="font-size:11.5px;font-weight:600;color:#334155;margin-bottom:4px;">${escapeHtml(fld.label)}${fld.required ? ' *' : ''}</div>
+                <div style="height:${fld.type === 'textarea' ? '44px' : '32px'};border-radius:${radii.md};border:1px solid #cbd5e1;background:#f8fafc;padding:0 10px;display:flex;align-items:center;font-size:12px;color:#94a3b8;">
+                  ${fld.type === 'select' ? `${escapeHtml((fld.options || [])[0] || 'Select...')} ▾` : escapeHtml(fld.placeholder || fld.label)}
+                </div>
+              </div>
+            `
+          )
+          .join('')}
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <span style="display:inline-flex;align-items:center;justify-content:center;padding:8px 18px;border-radius:${radii.btn};background:${escapeHtml(activeAccent)};color:${escapeHtml(accentText)};font-size:12.5px;font-weight:600;">
+          ${escapeHtml(tpl.multiStep ? 'Continue →' : tpl.submitLabel || 'Send Enquiry')}
+        </span>
+        <span style="font-size:11px;color:#94a3b8;">${escapeHtml(d.owner_email || 'Alerts via email')}</span>
+      </div>
+    </div>
+  `;
+}
 
 function renderSetupWizardView() {
   const step = state.setupStep;
   const d = state.setupData;
   const ws = state.workspace || {};
-  const formId = d.created_form_id || state.forms[0]?.id || 'contact';
+  const formId = d.created_form_id || state.forms[0]?.id || '';
   const activeAccent = d.accent_color || ws.accent_color || '#14383e';
-  const embedSnippet = `<!-- Zero-setup AskForms Slide-Over Drawer & Floating Launcher -->\n<script src="${state.baseUrl}/widget.js" data-form="${formId}" data-mode="${state.popoutMode}" data-label="Get a Quote" data-title="${d.form_name || 'Website Enquiry'}" data-accent="${activeAccent}" defer></script>\n<!-- Optional: link any existing button on their site to #askforms-${formId} -->`;
+  const embedSnippet = formId
+    ? getPlatformEmbedSnippet(state.embedPlatform, formId, d.form_name || 'Website Enquiry', activeAccent)
+    : 'Complete Step 3 first to generate your live form script.';
 
-  const steps = ['1. Brand', '2. Alerts & PIN', '3. Form', '4. Handoff'];
-  const activeBrand = d.brand_name || ws.brand_name || 'AskForms';
-  const tplLabel = ENQUIRY_TEMPLATES[d.template]?.label || 'Trades & Quote';
+  const steps = ['1. Brand', '2. Alerts', '3. Form', '4. Handoff'];
+  const alertOptions = [
+    { id: '', label: 'Email only (no extra push channel)', ph: '' },
+    { id: 'ntfy', label: 'ntfy Push (Free iOS & Android)', ph: 'Topic name, e.g. askforms-harbour' },
+    { id: 'telegram', label: 'Telegram Bot (Free Unlimited)', ph: 'Bot Token (123456:ABC...)' },
+    { id: 'discord', label: 'Discord Channel Webhook', ph: 'https://discord.com/api/webhooks/...' },
+    { id: 'slack', label: 'Slack Incoming Webhook', ph: 'https://hooks.slack.com/services/...' },
+    { id: 'whatsapp', label: 'WhatsApp (CallMeBot)', ph: 'Phone (+61412345678)' },
+    { id: 'teams', label: 'Microsoft Teams Webhook', ph: 'https://outlook.office.com/webhook/...' },
+    { id: 'google_chat', label: 'Google Chat Space Webhook', ph: 'https://chat.googleapis.com/v1/spaces/...' },
+    { id: 'line', label: 'LINE Messaging', ph: 'Channel Access Token' },
+    { id: 'wechat', label: 'WeChat Work Robot', ph: 'https://qyapi.weixin.qq.com/...' },
+    { id: 'gotify', label: 'Gotify Push Server', ph: 'https://push.yourdomain.com' },
+    { id: 'custom_webhook', label: 'Make / Zapier / CRM Webhook', ph: 'https://hook.make.com/...' },
+  ];
+  const activeAlertMeta = alertOptions.find((a) => a.id === (d.alert_channel || '')) || alertOptions[0];
+  const needsExtraAlertField = ['telegram', 'whatsapp', 'line', 'gotify'].includes(d.alert_channel || '');
+  const extraAlertLabel =
+    d.alert_channel === 'telegram'
+      ? 'Telegram Chat ID'
+      : d.alert_channel === 'whatsapp'
+      ? 'CallMeBot API Key'
+      : d.alert_channel === 'line'
+      ? 'LINE User or Group ID'
+      : 'Gotify App Token';
 
   els.content.innerHTML = `
     <div class="page-band has-tabs">
       <div class="page-band-inner">
         <div class="page-band-top">
-          <h1 class="page-band-title">Brand & Setup</h1>
+          <h1 class="page-band-title">Settings</h1>
           <div class="toolbar-group">
             <button type="button" class="btn btn-secondary" data-action="export-brand-kit">${icons.download} Brand Kit</button>
-            <label class="btn btn-secondary" style="cursor:pointer;">
-              Import
-              <input type="file" id="import-brand-input" accept="application/json,.json" style="display:none;" />
-            </label>
             <a class="btn btn-secondary" href="/api/workspace/backup.json">${icons.download} Full Backup</a>
           </div>
         </div>
 
         <div class="underline-tabs" role="tablist">
-          <button class="underline-tab" data-nav="workspace">Brand & Hosting</button>
+          <button class="underline-tab" data-nav="channels">Notifications</button>
+          <button class="underline-tab" data-nav="workspace">Brand &amp; Hosting</button>
           <button class="underline-tab active" data-nav="setup">Setup Wizard</button>
         </div>
       </div>
@@ -2715,7 +2888,7 @@ function renderSetupWizardView() {
         <div class="split-grid-wide">
           <div class="card card-padded">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid var(--border-subtle);">
-              <h2 class="section-title" style="margin:0;">4-Step Client Setup</h2>
+              <h2 class="section-title" style="margin:0;">4-Step Guided Setup</h2>
               <div class="filter-pills">
                 ${steps
                   .map(
@@ -2730,11 +2903,11 @@ function renderSetupWizardView() {
           ? `
             <div class="form-grid-2">
               <div class="field-group">
-                <label class="field-label" for="wiz-brand">Client business name</label>
-                <input class="input" id="wiz-brand" value="${escapeHtml(d.brand_name || ws.brand_name)}" placeholder="Harbour Plumbing Co" />
+                <label class="field-label" for="wiz-brand">Business name <span style="color:var(--danger);">*</span></label>
+                <input class="input" id="wiz-brand" value="${escapeHtml(d.brand_name || ws.brand_name)}" placeholder="Harbour Plumbing Co" required />
               </div>
               <div class="field-group">
-                <label class="field-label" for="wiz-url">Client website URL</label>
+                <label class="field-label" for="wiz-url">Website URL (optional)</label>
                 <input class="input" id="wiz-url" type="url" value="${escapeHtml(d.website_url || ws.website_url)}" placeholder="https://harbourplumbing.com.au" />
               </div>
             </div>
@@ -2765,76 +2938,90 @@ function renderSetupWizardView() {
               </div>
             </div>
             <div style="display:flex;justify-content:flex-end;">
-              <button type="button" class="btn btn-primary" data-wizard-next="2">Continue to Alerts & PIN</button>
+              <button type="button" class="btn btn-primary" data-wizard-next="2">Continue to Alerts</button>
             </div>
           `
           : step === 2
           ? `
-            <div class="form-grid-2">
-              <div class="field-group">
-                <label class="field-label" for="wiz-email">Owner notification email</label>
-                <input class="input" id="wiz-email" type="email" value="${escapeHtml(d.owner_email)}" placeholder="owner@harbourplumbing.com.au" />
-              </div>
-              <div class="field-group">
-                <label class="field-label" for="wiz-pin">6-digit Owner Portal PIN (<span class="mono">/manage</span>)</label>
-                <input class="input mono" id="wiz-pin" maxlength="6" inputmode="numeric" value="${escapeHtml(d.owner_pin)}" placeholder="246810" />
-                <div class="field-hint">Gives the client mobile access to enquiries without seeing technical settings.</div>
-              </div>
+            <div class="field-group">
+              <label class="field-label" for="wiz-email">Notification email <span style="color:var(--danger);">*</span></label>
+              <input class="input" id="wiz-email" type="email" value="${escapeHtml(d.owner_email)}" placeholder="owner@harbourplumbing.com.au" required />
+              <div class="field-hint">Where new website enquiries should be delivered. You can also manage enquiries anytime from your dashboard login.</div>
             </div>
-            <div class="form-grid-2">
-              <div class="field-group">
-                <label class="field-label" for="wiz-alert-fmt">Instant mobile alert channel (optional)</label>
-                <select class="select" id="wiz-alert-fmt">
-                  <option value="telegram" ${d.alert_format === 'telegram' ? 'selected' : ''}>Telegram Bot</option>
-                  <option value="slack" ${d.alert_format === 'slack' ? 'selected' : ''}>Slack Channel</option>
-                  <option value="teams" ${d.alert_format === 'teams' ? 'selected' : ''}>Microsoft Teams</option>
-                  <option value="generic" ${d.alert_format === 'generic' ? 'selected' : ''}>Make / Zapier / CRM Webhook</option>
-                </select>
-              </div>
-              <div class="field-group">
-                <label class="field-label" for="wiz-alert-url">Webhook / Bot endpoint URL (optional)</label>
-                <input class="input" id="wiz-alert-url" type="url" value="${escapeHtml(d.alert_url)}" placeholder="https://api.telegram.org/bot.../sendMessage?chat_id=..." />
-              </div>
+
+            <div class="field-group">
+              <label class="field-label" for="wiz-alert-channel">Instant mobile or team alert channel (optional)</label>
+              <select class="select" id="wiz-alert-channel">
+                ${alertOptions
+                  .map((a) => `<option value="${escapeHtml(a.id)}" ${(d.alert_channel || '') === a.id ? 'selected' : ''}>${escapeHtml(a.label)}</option>`)
+                  .join('')}
+              </select>
             </div>
-            <div style="display:flex;justify-content:space-between;">
+
+            ${
+              d.alert_channel
+                ? `<div class="${needsExtraAlertField ? 'form-grid-2' : ''}" style="margin-bottom:18px;">
+                     <div class="field-group" style="margin-bottom:0;">
+                       <label class="field-label" for="wiz-alert-val">${escapeHtml(activeAlertMeta.label)} details</label>
+                       <input class="input" id="wiz-alert-val" value="${escapeHtml(d.alert_value || '')}" placeholder="${escapeHtml(activeAlertMeta.ph)}" />
+                     </div>
+                     ${
+                       needsExtraAlertField
+                         ? `<div class="field-group" style="margin-bottom:0;">
+                              <label class="field-label" for="wiz-alert-extra">${escapeHtml(extraAlertLabel)}</label>
+                              <input class="input" id="wiz-alert-extra" value="${escapeHtml(d.alert_extra || '')}" placeholder="${escapeHtml(extraAlertLabel)}" />
+                            </div>`
+                         : ''
+                     }
+                   </div>`
+                : ''
+            }
+
+            <div style="display:flex;justify-content:space-between;margin-top:8px;">
               <button type="button" class="btn btn-secondary" data-setup-step="1">Back</button>
-              <button type="button" class="btn btn-primary" data-wizard-next="3">Continue to Enquiry Form</button>
+              <button type="button" class="btn btn-primary" data-wizard-next="3">Continue to Form</button>
             </div>
           `
           : step === 3
           ? `
-            <div class="form-grid-2">
-              <div class="field-group">
-                <label class="field-label" for="wiz-fname">Form title</label>
-                <input class="input" id="wiz-fname" value="${escapeHtml(d.form_name)}" placeholder="Request a Quote" />
-              </div>
-              <div class="field-group">
-                <label class="field-label" for="wiz-tpl">SMB form template</label>
-                <select class="select" id="wiz-tpl">
-                  <option value="trades" ${d.template === 'trades' ? 'selected' : ''}>Trades & Quote (with Photo Upload)</option>
-                  <option value="general" ${d.template === 'general' ? 'selected' : ''}>Local Business Contact</option>
-                  <option value="callback" ${d.template === 'callback' ? 'selected' : ''}>Quick Callback Request (3 fields)</option>
-                  <option value="feedback" ${d.template === 'feedback' ? 'selected' : ''}>Private Feedback / Google Review Gate</option>
-                </select>
-              </div>
-            </div>
-            <div class="toggle-row" style="border-top:1px solid var(--border-subtle);margin-bottom:14px;">
-              <div>
-                <div class="cell-primary">Multi-step quote flow</div>
-                <div class="cell-secondary">Splits fields into 2 clean steps to lower form abandonment on mobile.</div>
-              </div>
-              <label class="toggle-switch">
-                <input type="checkbox" id="wiz-multistep" ${d.multi_step ? 'checked' : ''} />
-                <span class="toggle-track"></span>
-              </label>
-            </div>
             <div class="field-group">
-              <label class="field-label" for="wiz-review">Google Business Review URL (optional — enables 1–5 star Review Gate)</label>
-              <input class="input" id="wiz-review" type="url" value="${escapeHtml(d.review_gate_url)}" placeholder="https://g.page/r/your-client/review" />
+              <label class="field-label" for="wiz-fname">Form title <span style="color:var(--danger);">*</span></label>
+              <input class="input" id="wiz-fname" value="${escapeHtml(d.form_name)}" placeholder="Request a Quote" required />
             </div>
+
+            <div class="field-group">
+              <label class="field-label">Choose a starting template (preview updates live on the right)</label>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(210px, 1fr));gap:10px;">
+                ${Object.entries(ENQUIRY_TEMPLATES)
+                  .map(([key, tpl]) => {
+                    const selected = (d.template || 'trades') === key;
+                    return `
+                      <button type="button" data-wiz-pick-tpl="${key}" style="text-align:left;padding:12px 14px;border-radius:12px;border:1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'};background:${selected ? 'var(--bg-canvas)' : '#ffffff'};cursor:pointer;display:flex;flex-direction:column;gap:4px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                          <strong style="font-size:13.5px;color:var(--ink-primary);">${escapeHtml(tpl.label)}</strong>
+                          <span class="tag" style="font-size:10px;padding:1px 6px;">${tpl.multiStep ? '2-Step' : '1-Step'}</span>
+                        </div>
+                        <div style="font-size:11.5px;color:var(--ink-muted);line-height:1.4;">${escapeHtml(tpl.fields.slice(0, 4).map((f) => f.label).join(', '))}</div>
+                      </button>
+                    `;
+                  })
+                  .join('')}
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:12px;background:var(--bg-canvas);border:1px solid var(--border-subtle);margin-bottom:16px;flex-wrap:wrap;">
+              <div style="font-size:13px;color:var(--ink-secondary);">Want custom fields or a tailored industry form?</div>
+              <button type="button" class="btn btn-secondary btn-sm" data-action="open-ai-chat">Build with AI instead</button>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="wiz-review">Google Review URL (optional)</label>
+              <input class="input" id="wiz-review" type="url" value="${escapeHtml(d.review_gate_url)}" placeholder="https://g.page/r/your-business/review" />
+            </div>
+
             <div style="display:flex;justify-content:space-between;">
               <button type="button" class="btn btn-secondary" data-setup-step="2">Back</button>
-              <button type="button" class="btn btn-primary" data-wizard-finish="1">Provision client setup</button>
+              <button type="button" class="btn btn-primary" data-wizard-finish="1">Create Form &amp; Continue</button>
             </div>
           `
           : `
@@ -2842,7 +3029,7 @@ function renderSetupWizardView() {
               <div class="filter-pills">
                 ${Object.keys(PLATFORM_INSTRUCTIONS)
                   .map((p) => {
-                    const names = { webflow: 'Webflow', wordpress: 'WordPress', squarespace: 'Squarespace', wix: 'Wix', html: 'Custom HTML' };
+                    const names = { webflow: 'Webflow', wordpress: 'WordPress', squarespace: 'Squarespace', wix: 'Wix', shopify: 'Shopify', html: 'Custom HTML' };
                     return `<button type="button" class="filter-pill ${state.embedPlatform === p ? 'active' : ''}" data-embed-platform="${p}">${names[p] || p}</button>`;
                   })
                   .join('')}
@@ -2851,62 +3038,29 @@ function renderSetupWizardView() {
             <p class="cell-secondary" style="margin:0 0 12px;font-size:13px;">${escapeHtml(PLATFORM_INSTRUCTIONS[state.embedPlatform])}</p>
             <pre class="code-block code-block-wrap" style="margin-bottom:14px;">${escapeHtml(embedSnippet)}</pre>
             <div style="display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap;">
-              <button type="button" class="btn btn-primary btn-sm" data-copy="${escapeHtml(embedSnippet)}">${icons.copy} Copy popout script</button>
-              <button type="button" class="btn btn-secondary btn-sm" data-test-popout="${escapeHtml(formId)}" data-test-mode="drawer">${icons.popout} Test Slide-Over Drawer</button>
-              <button type="button" class="btn btn-secondary btn-sm" data-test-popout="${escapeHtml(formId)}" data-test-mode="popover">Test Chat Window</button>
-            </div>
-
-            <div class="kv-list" style="margin-bottom:18px;">
-              <div class="kv-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-                <div>
-                  <div class="kv-key">Client phone bookmark (Owner Daily Ops Portal)</div>
-                  <div class="kv-val mono">${escapeHtml(state.baseUrl)}/manage</div>
-                </div>
-                <div class="toolbar-group">
-                  <button type="button" class="btn btn-secondary btn-sm" data-copy="${escapeHtml(state.baseUrl)}/manage">${icons.copy} Copy link</button>
-                  <a class="btn btn-dark btn-sm" href="/manage" target="_blank" rel="noopener">Open /manage ${icons.external}</a>
-                </div>
-              </div>
+              <button type="button" class="btn btn-primary btn-sm" data-copy="${escapeHtml(embedSnippet)}">${icons.copy} Copy embed code</button>
+              ${
+                formId
+                  ? `<button type="button" class="btn btn-secondary btn-sm" data-test-popout="${escapeHtml(formId)}" data-test-mode="drawer">${icons.popout} Test Slide-Over Form</button>
+                     <button type="button" class="btn btn-secondary btn-sm" data-test-popout="${escapeHtml(formId)}" data-test-mode="popover">Test Chat Window</button>`
+                  : ''
+              }
             </div>
 
             <div style="display:flex;justify-content:space-between;">
               <button type="button" class="btn btn-secondary" data-setup-step="3">Back</button>
-              <button type="button" class="btn btn-primary" data-open-form="${escapeHtml(formId)}">Open form workspace</button>
+              ${
+                formId
+                  ? `<button type="button" class="btn btn-primary" data-open-form="${escapeHtml(formId)}">Edit Fields &amp; Routing →</button>`
+                  : `<button type="button" class="btn btn-primary" data-nav="forms">Go to Forms</button>`
+              }
             </div>
           `
       }
           </div>
 
-          <div class="card-petrol card-padded" style="position:sticky;top:104px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px;">
-              <h2 class="section-title" style="margin:0;">Handoff Summary</h2>
-              <span class="tag tag-accent">Step ${step} of 4</span>
-            </div>
-            <div class="kv-list" style="margin-bottom:18px;">
-              <div class="kv-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-                <div>
-                  <div class="kv-key">Client brand</div>
-                  <div class="kv-val" style="font-weight:600;">${escapeHtml(activeBrand)}</div>
-                </div>
-                <span style="width:24px;height:24px;border-radius:50%;background:${escapeHtml(activeAccent)};border:2px solid rgba(255,255,255,0.28);flex-shrink:0;" title="${escapeHtml(activeAccent)}"></span>
-              </div>
-              <div class="kv-row">
-                <div class="kv-key">Owner alerts</div>
-                <div class="kv-val">${escapeHtml(d.owner_email || 'Pending configuration')}</div>
-              </div>
-              <div class="kv-row">
-                <div class="kv-key">Daily Ops PIN</div>
-                <div class="kv-val mono">${d.owner_pin ? '•••••• (6-digit active)' : 'Not set'}</div>
-              </div>
-              <div class="kv-row">
-                <div class="kv-key">Primary form</div>
-                <div class="kv-val">${escapeHtml(d.form_name || 'Website Enquiry')} · ${escapeHtml(tplLabel)}</div>
-              </div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:10px;">
-              <a class="btn btn-mint" href="/manage" target="_blank" rel="noopener" style="width:100%;">Preview Owner Portal ${icons.external}</a>
-              <button type="button" class="btn btn-hero-ghost" data-action="open-deploy-modal" style="width:100%;">${icons.deploy} Deployment Commands</button>
-            </div>
+          <div id="wiz-live-preview-card" class="card-petrol card-padded" style="position:sticky;top:104px;">
+            ${buildWizardLivePreviewHtml()}
           </div>
         </div>
       </div>
@@ -2941,22 +3095,66 @@ function toggleSidebarPane() {
 
 function launchLivePopoutPreview(formId, mode = 'drawer') {
   const form = state.forms.find((f) => f.id === formId) || state.currentForm;
-  const title = form?.name || 'Website Enquiry';
+  if (!form) {
+    showToast('Create or save the form first before testing.');
+    return;
+  }
+  const title = form.name || 'Website Enquiry';
+
+  // In Demo Mode, forms live in ephemeral sessionStorage (not D1), so render an instant interactive preview modal
+  if (isDemoMode()) {
+    const fields = Array.isArray(form.fields) ? form.fields : [];
+    const fieldsHtml = fields
+      .map((fld) => {
+        if (fld.type === 'textarea') {
+          return `<div class="field-group"><label class="field-label">${escapeHtml(fld.label)}${fld.required ? ' *' : ''}</label><textarea class="textarea" placeholder="${escapeHtml(fld.placeholder || '')}"></textarea></div>`;
+        }
+        if (fld.type === 'select') {
+          const opts = (Array.isArray(fld.options) ? fld.options : String(fld.options || '').split(',')).map((o) => `<option>${escapeHtml(String(o).trim())}</option>`).join('');
+          return `<div class="field-group"><label class="field-label">${escapeHtml(fld.label)}${fld.required ? ' *' : ''}</label><select class="select">${opts}</select></div>`;
+        }
+        if (fld.type === 'checklist') {
+          const opts = (Array.isArray(fld.options) ? fld.options : String(fld.options || '').split(','))
+            .map((o) => `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin:5px 0;"><input type="checkbox" /> <span>${escapeHtml(String(o).trim())}</span></label>`)
+            .join('');
+          return `<div class="field-group"><label class="field-label">${escapeHtml(fld.label)}${fld.required ? ' *' : ''}</label><div>${opts}</div></div>`;
+        }
+        if (fld.type === 'checkbox') {
+          return `<div class="field-group"><label style="display:flex;align-items:center;gap:8px;font-size:13.5px;"><input type="checkbox" /> <span>${escapeHtml(fld.label)}</span></label></div>`;
+        }
+        return `<div class="field-group"><label class="field-label">${escapeHtml(fld.label)}${fld.required ? ' *' : ''}</label><input class="input" type="${escapeHtml(fld.type || 'text')}" placeholder="${escapeHtml(fld.placeholder || '')}" /></div>`;
+      })
+      .join('');
+    els.modal.classList.remove('hidden');
+    els.modalBackdrop.classList.remove('hidden');
+    els.modal.innerHTML = `
+      <div class="drawer-header">
+        <strong>${escapeHtml(title)} (Live Preview)</strong>
+        <button class="btn btn-ghost btn-sm" data-action="close-modal" aria-label="Close">${icons.close}</button>
+      </div>
+      <form class="modal-body" onsubmit="event.preventDefault();this.innerHTML='<div style=\\'padding:28px 12px;text-align:center;\\'><strong style=\\'font-size:16px;\\'>Enquiry received!</strong><p style=\\'color:var(--ink-secondary);margin:8px 0 0;font-size:13.5px;\\'>In production, this submission is saved and triggers your enabled notifications &amp; routing rules.</p></div>';">
+        ${fieldsHtml}
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">${escapeHtml(form.submit_label || 'Send Enquiry')}</button>
+      </form>
+    `;
+    return;
+  }
+
   if (window.AskForms) {
-    window.AskForms.open({ formId, mode, title });
+    window.AskForms.open({ formId: form.id, mode, title });
     return;
   }
   const script = document.createElement('script');
   script.src = `/widget.js?v=${Date.now()}`;
-  script.setAttribute('data-form', formId);
+  script.setAttribute('data-form', form.id);
   script.setAttribute('data-mode', mode);
   script.setAttribute('data-launcher', 'false');
-  script.setAttribute('data-label', form?.submit_label || 'Get a Quote');
+  script.setAttribute('data-label', form.submit_label || 'Get a Quote');
   script.setAttribute('data-title', title);
   script.setAttribute('data-accent', state.workspace?.accent_color || '#14383e');
   script.onload = () => {
     if (window.AskForms) {
-      window.AskForms.open({ formId, mode, title });
+      window.AskForms.open({ formId: form.id, mode, title });
     }
   };
   document.body.appendChild(script);
@@ -3117,13 +3315,15 @@ function renderChannelsView() {
     .map((ch) => {
       const chCfg = cfg[ch.id] || {};
       const isOn = Boolean(chCfg.enabled);
+      const logoSvg = CHANNEL_LOGOS[ch.id] || CHANNEL_LOGOS.custom_webhook;
       const fieldsHtml = (ch.fields || [])
         .map(
           (f) => `
-            <div class="field-group" style="margin-bottom:10px;">
-              <label class="field-label">${escapeHtml(f.label)}</label>
+            <div class="field-group" style="margin-bottom:8px;">
+              <label class="field-label" style="font-size:12px;">${escapeHtml(f.label)}</label>
               <input
                 class="input"
+                style="height:36px;font-size:13px;"
                 type="${escapeHtml(f.type || 'text')}"
                 data-ch-field="${escapeHtml(ch.id)}"
                 data-field-key="${escapeHtml(f.key)}"
@@ -3136,15 +3336,20 @@ function renderChannelsView() {
         .join('');
 
       return `
-        <article class="card card-padded" style="display:flex;flex-direction:column;justify-content:space-between;gap:14px;">
+        <article class="card" style="padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;border-color:${isOn ? 'var(--accent)' : 'var(--border-subtle)'};transition:border-color 0.16s ease, box-shadow 0.16s ease;">
           <div>
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">
-              <div>
-                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                  <strong style="font-size:15.5px;color:var(--text-primary);">${escapeHtml(ch.name)}</strong>
-                  <span class="tag tag-accent" style="font-size:11px;">${escapeHtml(ch.cost)}</span>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+              <div style="display:flex;align-items:center;gap:11px;min-width:0;">
+                <span style="width:36px;height:36px;border-radius:10px;background:var(--bg-canvas);border:1px solid var(--border-subtle);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  ${logoSvg}
+                </span>
+                <div style="min-width:0;">
+                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                    <strong style="font-size:14px;color:var(--ink-primary);line-height:1.2;">${escapeHtml(ch.name)}</strong>
+                    <span class="tag" style="font-size:10px;padding:1px 6px;">${escapeHtml(ch.cost.replace('100% ', ''))}</span>
+                  </div>
+                  <div style="font-size:12px;color:var(--ink-muted);margin-top:2px;line-height:1.35;">${escapeHtml(ch.description)}</div>
                 </div>
-                <div style="font-size:12.5px;color:var(--text-secondary);margin-top:4px;">${escapeHtml(ch.description)}</div>
               </div>
               <label class="switch" title="Toggle ${escapeHtml(ch.name)}">
                 <input type="checkbox" data-ch-toggle="${escapeHtml(ch.id)}" ${isOn ? 'checked' : ''} />
@@ -3152,10 +3357,10 @@ function renderChannelsView() {
               </label>
             </div>
 
-            <div class="${isOn ? '' : 'hidden'}" data-ch-body="${escapeHtml(ch.id)}" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-subtle);">
+            <div class="${isOn ? '' : 'hidden'}" data-ch-body="${escapeHtml(ch.id)}" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-subtle);">
               ${fieldsHtml}
-              <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
-                <button type="button" class="btn btn-secondary btn-sm" data-action="test-channel" data-channel-id="${escapeHtml(ch.id)}">Send Test Alert</button>
+              <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+                <button type="button" class="btn btn-secondary btn-sm" data-action="test-channel" data-channel-id="${escapeHtml(ch.id)}">Send Test</button>
                 <button type="button" class="btn btn-primary btn-sm" data-action="save-channels">Save</button>
               </div>
             </div>
@@ -3166,23 +3371,29 @@ function renderChannelsView() {
     .join('');
 
   els.content.innerHTML = `
-    <div class="page-band">
+    <div class="page-band has-tabs">
       <div class="page-band-inner">
         <div class="page-band-top">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <h1 class="page-band-title">Notifications &amp; Webhooks</h1>
-            <span class="tag tag-accent">${enabledCount} Active</span>
+            <h1 class="page-band-title">Settings</h1>
+            <span class="tag tag-accent">${enabledCount} Active ${enabledCount === 1 ? 'Channel' : 'Channels'}</span>
           </div>
           <div class="toolbar-group">
-            <button type="button" class="btn btn-primary btn-sm" data-action="save-channels">Save All Channels</button>
+            <button type="button" class="btn btn-primary btn-sm" data-action="save-channels">Save Changes</button>
           </div>
+        </div>
+
+        <div class="underline-tabs" role="tablist">
+          <button class="underline-tab active" data-nav="channels">Notifications</button>
+          <button class="underline-tab" data-nav="workspace">Brand &amp; Hosting</button>
+          ${isDemoMode() ? '' : `<button class="underline-tab" data-nav="setup">Setup Wizard</button>`}
         </div>
       </div>
     </div>
 
     <div class="content-inner">
       <div class="content-container view-animate">
-        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr));gap:20px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(min(100%, 290px), 1fr));gap:14px;">
           ${cardsHtml}
         </div>
       </div>
@@ -3756,9 +3967,74 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
+  const wizPickTplBtn = target.closest('[data-wiz-pick-tpl]');
+  if (wizPickTplBtn) {
+    state.setupData.template = wizPickTplBtn.dataset.wizPickTpl;
+    const fnEl = document.getElementById('wiz-fname');
+    if (fnEl) state.setupData.form_name = fnEl.value.trim() || state.setupData.form_name;
+    render();
+    return;
+  }
+
+  function validateWizardStep(stepNum) {
+    if (stepNum === 1) {
+      const brand = (document.getElementById('wiz-brand')?.value ?? state.setupData.brand_name ?? '').trim();
+      const urlVal = (document.getElementById('wiz-url')?.value ?? state.setupData.website_url ?? '').trim();
+      if (!brand) {
+        showToast('Enter a business name first');
+        document.getElementById('wiz-brand')?.focus();
+        return false;
+      }
+      if (urlVal && !/^https?:\/\/.+\..+/i.test(urlVal)) {
+        showToast('Enter a valid website URL starting with https:// (or leave it blank)');
+        document.getElementById('wiz-url')?.focus();
+        return false;
+      }
+      state.setupData.brand_name = brand;
+      state.setupData.website_url = urlVal;
+      state.setupData.accent_color = document.getElementById('wiz-accent')?.value?.trim() || state.setupData.accent_color || '#14383e';
+      state.setupData.font_preset = document.getElementById('wiz-font')?.value || state.setupData.font_preset || 'minimal';
+      state.setupData.radius_preset = document.getElementById('wiz-radius')?.value || state.setupData.radius_preset || 'balanced';
+      return true;
+    }
+    if (stepNum === 2) {
+      const email = (document.getElementById('wiz-email')?.value ?? state.setupData.owner_email ?? '').trim();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showToast('Enter a valid notification email address');
+        document.getElementById('wiz-email')?.focus();
+        return false;
+      }
+      state.setupData.owner_email = email;
+      state.setupData.alert_channel = document.getElementById('wiz-alert-channel')?.value ?? state.setupData.alert_channel ?? '';
+      state.setupData.alert_value = document.getElementById('wiz-alert-val')?.value?.trim() ?? state.setupData.alert_value ?? '';
+      state.setupData.alert_extra = document.getElementById('wiz-alert-extra')?.value?.trim() ?? state.setupData.alert_extra ?? '';
+      return true;
+    }
+    if (stepNum === 3) {
+      const fname = (document.getElementById('wiz-fname')?.value ?? state.setupData.form_name ?? '').trim();
+      if (!fname) {
+        showToast('Enter a form title first');
+        document.getElementById('wiz-fname')?.focus();
+        return false;
+      }
+      state.setupData.form_name = fname;
+      state.setupData.review_gate_url = document.getElementById('wiz-review')?.value?.trim() ?? state.setupData.review_gate_url ?? '';
+      return true;
+    }
+    return true;
+  }
+
   const setupStepBtn = target.closest('[data-setup-step]');
   if (setupStepBtn) {
-    state.setupStep = Number(setupStepBtn.dataset.setupStep);
+    const targetStep = Number(setupStepBtn.dataset.setupStep);
+    if (targetStep > state.setupStep) {
+      if (!validateWizardStep(state.setupStep)) return;
+      if (targetStep === 4 && !state.setupData.created_form_id && state.forms.length === 0) {
+        showToast('Create your form in Step 3 before viewing Handoff.');
+        return;
+      }
+    }
+    state.setupStep = targetStep;
     render();
     return;
   }
@@ -3773,29 +4049,14 @@ document.addEventListener('click', async (e) => {
   const wizNextBtn = target.closest('[data-wizard-next]');
   if (wizNextBtn) {
     const next = Number(wizNextBtn.dataset.wizardNext);
-    if (state.setupStep === 1) {
-      state.setupData.brand_name = document.getElementById('wiz-brand')?.value?.trim() || state.workspace.brand_name;
-      state.setupData.website_url = document.getElementById('wiz-url')?.value?.trim() || '';
-      state.setupData.accent_color = document.getElementById('wiz-accent')?.value?.trim() || '#095c4f';
-      state.setupData.font_preset = document.getElementById('wiz-font')?.value || 'editorial';
-      state.setupData.radius_preset = document.getElementById('wiz-radius')?.value || 'balanced';
-    } else if (state.setupStep === 2) {
-      state.setupData.owner_email = document.getElementById('wiz-email')?.value?.trim() || '';
-      state.setupData.owner_pin = document.getElementById('wiz-pin')?.value?.trim() || '';
-      state.setupData.alert_format = document.getElementById('wiz-alert-fmt')?.value || 'telegram';
-      state.setupData.alert_url = document.getElementById('wiz-alert-url')?.value?.trim() || '';
-    }
+    if (!validateWizardStep(state.setupStep)) return;
     state.setupStep = next;
     render();
     return;
   }
 
   if (target.closest('[data-wizard-finish]')) {
-    state.setupData.form_name = document.getElementById('wiz-fname')?.value?.trim() || 'Website Enquiry';
-    state.setupData.template = document.getElementById('wiz-tpl')?.value || 'trades';
-    state.setupData.multi_step = Boolean(document.getElementById('wiz-multistep')?.checked);
-    state.setupData.review_gate_url = document.getElementById('wiz-review')?.value?.trim() || '';
-
+    if (!validateWizardStep(3)) return;
     const d = state.setupData;
     const tpl = ENQUIRY_TEMPLATES[d.template] || ENQUIRY_TEMPLATES.trades;
     try {
@@ -3808,9 +4069,6 @@ document.addEventListener('click', async (e) => {
         radius_preset: d.radius_preset,
         setup_completed: true,
       };
-      if (/^\d{6}$/.test(d.owner_pin || '')) {
-        wsPayload.new_owner_pin = d.owner_pin;
-      }
       const { workspace } = await api.updateWorkspace(wsPayload);
       state.workspace = workspace;
       applyWorkspaceBranding();
@@ -3821,23 +4079,58 @@ document.addEventListener('click', async (e) => {
         email_recipients: d.owner_email,
         fields: tpl.fields,
         submit_label: tpl.submitLabel,
-        multi_step: d.multi_step,
+        multi_step: Boolean(tpl.multiStep),
         review_gate_url: d.review_gate_url,
       });
 
-      if (d.alert_url) {
-        await api.createWebhook(created.id, {
-          label: `${d.alert_format.toUpperCase()} Instant Alert`,
-          target_url: d.alert_url,
-          format: d.alert_format,
-        });
+      // Save chosen instant alert channel into Notifications config if provided
+      if (d.alert_channel && d.alert_value) {
+        const chRes = await api.getChannels().catch(() => ({ config: {} }));
+        const nextCfg = { ...(chRes.config || {}) };
+        const ch = d.alert_channel;
+        if (ch === 'ntfy') nextCfg.ntfy = { enabled: true, topic: d.alert_value };
+        else if (ch === 'telegram') nextCfg.telegram = { enabled: true, botToken: d.alert_value, chatId: d.alert_extra || '' };
+        else if (ch === 'whatsapp') nextCfg.whatsapp = { enabled: true, phone: d.alert_value, apiKey: d.alert_extra || '' };
+        else if (ch === 'line') nextCfg.line = { enabled: true, channelToken: d.alert_value, toId: d.alert_extra || '' };
+        else if (ch === 'gotify') nextCfg.gotify = { enabled: true, serverUrl: d.alert_value, appToken: d.alert_extra || '' };
+        else nextCfg[ch] = { enabled: true, webhookUrl: d.alert_value };
+        await api.saveChannels(nextCfg).catch(() => {});
       }
 
       state.setupData.created_form_id = created.id;
       await refreshBootstrap();
       state.setupStep = 4;
       render();
-      showToast('Client workspace & enquiry form provisioned');
+      showToast(`Created "${created.name}" — ready to test & embed!`);
+    } catch (err) {
+      showToast(err.message);
+    }
+    return;
+  }
+
+  if (target.closest('[data-action="add-routing-rule"]')) {
+    const firstField = state.currentForm?.fields?.find((fld) => fld.type === 'select')?.name || state.currentForm?.fields?.[0]?.name || 'service';
+    state.routingRules = [...(state.routingRules || []), { field: firstField, match: 'equals', value: '', target: '' }];
+    render();
+    return;
+  }
+
+  const removeRouteBtn = target.closest('[data-route-remove]');
+  if (removeRouteBtn) {
+    const idx = Number(removeRouteBtn.dataset.routeRemove);
+    state.routingRules.splice(idx, 1);
+    render();
+    return;
+  }
+
+  if (target.closest('[data-action="save-routing-rules"]')) {
+    try {
+      const cleaned = (state.routingRules || []).filter((r) => r.field && r.value && r.target);
+      await api.updateForm(state.selectedFormId, { routing_rules: cleaned });
+      state.routingRules = cleaned;
+      await loadFormDetail(state.selectedFormId);
+      render();
+      showToast(`Saved ${cleaned.length} conditional routing ${cleaned.length === 1 ? 'rule' : 'rules'}`);
     } catch (err) {
       showToast(err.message);
     }
@@ -4394,6 +4687,32 @@ document.addEventListener('change', async (e) => {
   if (e.target.id === 'wiz-accent-pick') {
     const inp = document.getElementById('wiz-accent');
     if (inp) inp.value = e.target.value;
+    state.setupData.accent_color = e.target.value;
+    const card = document.getElementById('wiz-live-preview-card');
+    if (card) card.innerHTML = buildWizardLivePreviewHtml();
+    return;
+  }
+  if (e.target.id === 'wiz-font' || e.target.id === 'wiz-radius') {
+    if (e.target.id === 'wiz-font') state.setupData.font_preset = e.target.value;
+    if (e.target.id === 'wiz-radius') state.setupData.radius_preset = e.target.value;
+    const card = document.getElementById('wiz-live-preview-card');
+    if (card) card.innerHTML = buildWizardLivePreviewHtml();
+    return;
+  }
+  if (e.target.id === 'wiz-alert-channel') {
+    state.setupData.alert_channel = e.target.value;
+    state.setupData.alert_value = '';
+    state.setupData.alert_extra = '';
+    render();
+    return;
+  }
+  if (e.target.matches('[data-route-prop]')) {
+    const idx = Number(e.target.dataset.routeIdx);
+    const prop = e.target.dataset.routeProp;
+    if (state.routingRules[idx]) {
+      state.routingRules[idx][prop] = e.target.value;
+      if (prop === 'field' || prop === 'match') render();
+    }
     return;
   }
   if (e.target.id === 'sb-form') {
@@ -4729,13 +5048,32 @@ document.addEventListener('submit', async (e) => {
   }
 });
 
-// Live input sync for Notification Channel fields
+// Live input sync for Notification Channel fields, Setup Wizard Preview, and Routing Rules
 document.addEventListener('input', (e) => {
   if (e.target.matches('[data-ch-field]')) {
     const chId = e.target.getAttribute('data-ch-field');
     const key = e.target.getAttribute('data-field-key');
     if (!state.channelsConfig[chId]) state.channelsConfig[chId] = { enabled: true };
     state.channelsConfig[chId][key] = e.target.value;
+    return;
+  }
+  if (e.target.matches('[data-route-prop]')) {
+    const idx = Number(e.target.dataset.routeIdx);
+    const prop = e.target.dataset.routeProp;
+    if (state.routingRules[idx]) state.routingRules[idx][prop] = e.target.value;
+    return;
+  }
+  if (['wiz-brand', 'wiz-accent', 'wiz-email', 'wiz-fname'].includes(e.target.id)) {
+    if (e.target.id === 'wiz-brand') state.setupData.brand_name = e.target.value;
+    if (e.target.id === 'wiz-accent' && /^#[0-9a-fA-F]{6}$/.test(e.target.value.trim())) {
+      state.setupData.accent_color = e.target.value.trim();
+      const pick = document.getElementById('wiz-accent-pick');
+      if (pick) pick.value = state.setupData.accent_color;
+    }
+    if (e.target.id === 'wiz-email') state.setupData.owner_email = e.target.value;
+    if (e.target.id === 'wiz-fname') state.setupData.form_name = e.target.value;
+    const card = document.getElementById('wiz-live-preview-card');
+    if (card) card.innerHTML = buildWizardLivePreviewHtml();
   }
 });
 

@@ -387,6 +387,64 @@ export async function onRequest(context) {
         const okCh = chResults.filter((c) => c.ok).length;
         trace.push({ step: 'channels', status: okCh === chResults.length ? 'passed' : 'warning', detail: `${okCh}/${chResults.length} notification channel(s) sent` });
       }
+
+      // Evaluate Conditional Routing Rules (field == value -> email or webhook URL)
+      const routeRow = await db.prepare('SELECT value FROM app_settings WHERE key = ?').bind(`form_routing_${formId}`).first();
+      let routingRules = [];
+      try {
+        routingRules = JSON.parse(routeRow?.value || '[]');
+      } catch {}
+      if (Array.isArray(routingRules) && routingRules.length > 0) {
+        const matchedRoutes = [];
+        let resendKey = String(env.RESEND_API_KEY || '').trim();
+        try {
+          const chCfg = JSON.parse(chRow?.value || '{}');
+          if (!resendKey && chCfg.email_resend?.apiKey) resendKey = String(chCfg.email_resend.apiKey).trim();
+        } catch {}
+
+        for (const rule of routingRules) {
+          const fieldKey = String(rule.field || '').trim();
+          const expected = String(rule.value || '').trim().toLowerCase();
+          const target = String(rule.target || '').trim();
+          if (!fieldKey || !expected || !target) continue;
+
+          const actualRaw = fields[fieldKey];
+          const actual = Array.isArray(actualRaw) ? actualRaw.join(', ').toLowerCase() : String(actualRaw || '').trim().toLowerCase();
+          const isMatch = rule.match === 'contains' ? actual.includes(expected) : actual === expected;
+          if (!isMatch) continue;
+
+          if (/^https?:\/\//i.test(target)) {
+            try {
+              await fetch(target, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ event: 'askforms.routed', rule, form: { id: formId, name: form.name }, submissionId: subId, data: fields }),
+              });
+              matchedRoutes.push(`Webhook → ${target}`);
+            } catch {}
+          } else if (target.includes('@') && resendKey) {
+            try {
+              await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  from: ws.mail_from || 'AskForms <onboarding@resend.dev>',
+                  to: [target],
+                  reply_to: String(raw._replyto || fields.email || '') || undefined,
+                  subject: `[Routed: ${rule.value}] ${form.name}`,
+                  text: Object.entries(fields).map(([k, v]) => `${k}: ${v}`).join('\n'),
+                }),
+              });
+              matchedRoutes.push(`Email → ${target}`);
+            } catch {}
+          } else if (target.includes('@')) {
+            matchedRoutes.push(`Email matched → ${target}`);
+          }
+        }
+        if (matchedRoutes.length > 0) {
+          trace.push({ step: 'routing', status: 'passed', detail: matchedRoutes.join(' · ') });
+        }
+      }
     }
 
     const accept = request.headers.get('Accept') || '';
@@ -962,7 +1020,11 @@ export async function onRequest(context) {
   if (pathname === '/api/forms' && method === 'POST') {
     const body = await request.json().catch(() => ({}));
     const name = String(body.name || 'Website Enquiry').trim();
-    const id = (body.id || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `form-${Date.now()}`;
+    let id = (body.id || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `form-${Date.now()}`;
+    const existing = await db.prepare('SELECT id FROM forms WHERE id = ?').bind(id).first();
+    if (existing) {
+      id = `${id}-${crypto.randomUUID().slice(0, 4)}`;
+    }
     const fields = Array.isArray(body.fields) && body.fields.length > 0 ? body.fields : DEFAULT_FIELDS;
     await db
       .prepare(`
@@ -972,7 +1034,7 @@ export async function onRequest(context) {
       .bind(id, name, body.client_name || 'Website', body.theme_preset || 'teagee', body.email_recipients || '', body.allowed_origins || '*', JSON.stringify(fields), body.submit_label || 'Send enquiry', body.multi_step ? 1 : 0, body.review_gate_url || '')
       .run();
     const created = await getFormWithCounts(db, id);
-    return jsonResp(201, { form: { ...created, fields: parseFields(created) } });
+    return jsonResp(201, { form: { ...created, fields: parseFields(created), routing_rules: [] } });
   }
 
   const formMatch = pathname.match(/^\/api\/forms\/([a-zA-Z0-9_-]+)$/);
@@ -982,7 +1044,10 @@ export async function onRequest(context) {
     if (!form) return jsonResp(404, { error: 'Form not found' });
     if (method === 'GET') {
       const webhooks = (await db.prepare('SELECT * FROM webhooks WHERE form_id = ? ORDER BY created_at DESC').bind(formId).all()).results || [];
-      return jsonResp(200, { form: { ...form, fields: parseFields(form) }, webhooks });
+      const routeRow = await db.prepare('SELECT value FROM app_settings WHERE key = ?').bind(`form_routing_${formId}`).first();
+      let routing_rules = [];
+      try { routing_rules = JSON.parse(routeRow?.value || '[]'); } catch {}
+      return jsonResp(200, { form: { ...form, fields: parseFields(form), routing_rules }, webhooks });
     }
     if (method === 'PATCH') {
       const body = await request.json().catch(() => ({}));
@@ -1012,8 +1077,14 @@ export async function onRequest(context) {
           formId
         )
         .run();
+      if (Array.isArray(body.routing_rules)) {
+        await setSetting(db, `form_routing_${formId}`, JSON.stringify(body.routing_rules));
+      }
+      const routeRow = await db.prepare('SELECT value FROM app_settings WHERE key = ?').bind(`form_routing_${formId}`).first();
+      let routing_rules = [];
+      try { routing_rules = JSON.parse(routeRow?.value || '[]'); } catch {}
       const updated = await getFormWithCounts(db, formId);
-      return jsonResp(200, { form: { ...updated, fields: parseFields(updated) } });
+      return jsonResp(200, { form: { ...updated, fields: parseFields(updated), routing_rules } });
     }
     if (method === 'DELETE') {
       await db.prepare('DELETE FROM forms WHERE id = ?').bind(formId).run();
