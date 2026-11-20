@@ -94,7 +94,7 @@ function demoStats(store) {
     totalForms: store.forms.length,
     validSubmissions: store.submissions.filter((s) => !s.is_spam).length,
     spamBlocked: store.submissions.filter((s) => s.is_spam).length,
-    emailsSent: 2,
+    emailsSent: 0,
     webhookTotal: 0,
     webhookOk: 0,
     deliveryRate: 100,

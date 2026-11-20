@@ -1,4 +1,4 @@
-import { api, copyText, escapeHtml, formatRelativeTime, formatTimestamp, isDemoMode } from './api.js?v=6';
+import { api, copyText, escapeHtml, formatRelativeTime, formatTimestamp, isDemoMode } from './api.js?v=7';
 import { icons } from './icons.js?v=4';
 
 const state = {
@@ -578,6 +578,9 @@ function renderFormsOverview() {
     })
     .join('');
 
+  const demo = isDemoMode();
+  const partner = isPartnerSession();
+
   els.content.innerHTML = `
     <div class="page-band">
       <div class="page-band-inner">
@@ -594,7 +597,7 @@ function renderFormsOverview() {
               <button type="button" class="filter-pill ${!showArchived ? 'active' : ''}" data-forms-status="active">Active (${activeList.length})</button>
               <button type="button" class="filter-pill ${showArchived ? 'active' : ''}" data-forms-status="archived">Archived (${archivedList.length})</button>
             </div>
-            <button class="btn btn-secondary" data-nav="setup">Setup Wizard</button>
+            ${demo || partner ? '' : `<button class="btn btn-secondary" data-nav="setup">Setup Wizard</button>`}
             <button class="btn btn-primary" data-action="open-create-modal">${icons.plus} New Form</button>
           </div>
         </div>
@@ -606,6 +609,10 @@ function renderFormsOverview() {
         <section class="hero-summary-band">
           <div class="hero-metrics">
             <div>
+              <div class="hero-metric-label">Active Forms</div>
+              <div class="hero-metric-val">${activeList.length}</div>
+            </div>
+            <div>
               <div class="hero-metric-label">Enquiries</div>
               <div class="hero-metric-val">${s.validSubmissions}</div>
             </div>
@@ -613,13 +620,13 @@ function renderFormsOverview() {
               <div class="hero-metric-label">Spam Shielded</div>
               <div class="hero-metric-val">${s.spamBlocked}</div>
             </div>
-            <div>
-              <div class="hero-metric-label">Delivery Rate</div>
-              <div class="hero-metric-val">${s.deliveryRate}%</div>
-            </div>
           </div>
           <div class="hero-actions">
-            <a class="btn btn-mint" href="/manage" target="_blank" rel="noopener">Open Owner Portal ${icons.external}</a>
+            ${
+              demo || partner
+                ? `<button class="btn btn-mint" data-action="open-create-modal">${icons.plus} Create Form</button>`
+                : `<a class="btn btn-mint" href="/manage" target="_blank" rel="noopener">Open Owner Portal ${icons.external}</a>`
+            }
             <button class="btn btn-hero-ghost" data-nav="assistant">${icons.sparkles || icons.plus} Build with AI</button>
           </div>
         </section>
@@ -627,36 +634,47 @@ function renderFormsOverview() {
         ${
           visibleForms.length === 0
             ? `<div class="card"><div class="empty-state">
-                <div class="empty-state-title">${showArchived ? 'No archived forms' : 'No forms configured yet'}</div>
-                <p>${showArchived ? 'Forms you archive will appear here so you can restore or permanently delete them anytime.' : 'Run the 4-step Setup Wizard or create your first website enquiry form.'}</p>
-                ${showArchived ? `<button class="btn btn-secondary" data-forms-status="active">Back to Active Forms</button>` : `<button class="btn btn-primary" data-action="open-create-modal">${icons.plus} Create Form</button>`}
+                <div class="empty-state-title">${showArchived ? 'No archived forms' : 'No forms created yet'}</div>
+                <p>${showArchived ? 'Forms you archive will appear here so you can restore or permanently delete them anytime.' : 'Create your first website enquiry form from a template or describe what you need to the AI Assistant.'}</p>
+                <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+                  ${
+                    showArchived
+                      ? `<button class="btn btn-secondary" data-forms-status="active">Back to Active Forms</button>`
+                      : `<button class="btn btn-primary" data-action="open-create-modal">${icons.plus} Create Form</button>
+                         <button class="btn btn-secondary" data-nav="assistant">Build with AI</button>`
+                  }
+                </div>
               </div></div>`
             : `<section class="forms-card-grid">${cards}</section>`
         }
 
-        <section class="utility-strip">
-          <button type="button" class="utility-card" data-nav="mail" style="text-align:left;">
-            <div>
-              <div class="fsc-client" style="margin-bottom:3px;">Notifications</div>
-              <div class="cell-primary" style="font-size:15px;">Mail Outbox</div>
-            </div>
-            <span class="tag tag-accent">${s.emailsSent || 0}</span>
-          </button>
-          <button type="button" class="utility-card" data-nav="webhooks" style="text-align:left;">
-            <div>
-              <div class="fsc-client" style="margin-bottom:3px;">Integrations</div>
-              <div class="cell-primary" style="font-size:15px;">Webhook Logs</div>
-            </div>
-            <span class="tag">${s.webhookTotal || 0}</span>
-          </button>
-          <a class="utility-card" href="/api/workspace/backup.json">
-            <div>
-              <div class="fsc-client" style="margin-bottom:3px;">Data Ownership</div>
-              <div class="cell-primary" style="font-size:15px;">Export Full Backup</div>
-            </div>
-            <span style="color:var(--ink-muted);">${icons.download}</span>
-          </a>
-        </section>
+        ${
+          demo || partner
+            ? ''
+            : `<section class="utility-strip">
+                <button type="button" class="utility-card" data-nav="mail" style="text-align:left;">
+                  <div>
+                    <div class="fsc-client" style="margin-bottom:3px;">Notifications</div>
+                    <div class="cell-primary" style="font-size:15px;">Mail Outbox</div>
+                  </div>
+                  <span class="tag tag-accent">${s.emailsSent || 0}</span>
+                </button>
+                <button type="button" class="utility-card" data-nav="webhooks" style="text-align:left;">
+                  <div>
+                    <div class="fsc-client" style="margin-bottom:3px;">Integrations</div>
+                    <div class="cell-primary" style="font-size:15px;">Webhook Logs</div>
+                  </div>
+                  <span class="tag">${s.webhookTotal || 0}</span>
+                </button>
+                <a class="utility-card" href="/api/workspace/backup.json">
+                  <div>
+                    <div class="fsc-client" style="margin-bottom:3px;">Data Ownership</div>
+                    <div class="cell-primary" style="font-size:15px;">Export Full Backup</div>
+                  </div>
+                  <span style="color:var(--ink-muted);">${icons.download}</span>
+                </a>
+              </section>`
+        }
       </div>
     </div>
   `;
@@ -2953,20 +2971,21 @@ function renderAssistantView() {
   const draft = state.assistantDraftForm;
 
   els.content.innerHTML = `
-    <div class="sub-header-bar">
-      <div class="sub-header-inner">
-        <div class="sub-header-left">
-          <h1 class="page-title" style="margin:0;">AI Assistant</h1>
-        </div>
-        <div class="sub-header-actions">
-          <button type="button" class="btn btn-secondary btn-sm" data-action="open-ai-settings">AI &amp; MCP Settings</button>
-          <button type="button" class="btn btn-ghost btn-sm" data-action="assistant-clear">Clear</button>
+    <div class="page-band">
+      <div class="page-band-inner">
+        <div class="page-band-top">
+          <h1 class="page-band-title">AI Assistant</h1>
+          <div class="toolbar-group">
+            <button type="button" class="btn btn-secondary btn-sm" data-action="open-ai-settings">AI &amp; MCP Settings</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-action="assistant-clear">Clear</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="content-container view-animate" style="max-width:780px;">
-      <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 210px);min-height:460px;overflow:hidden;">
+    <div class="content-inner">
+      <div class="content-container view-animate" style="max-width:780px;">
+        <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 230px);min-height:460px;overflow:hidden;">
         <div id="assistant-chat-log" style="flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:12px;">
           ${msgs
             .map(
@@ -3001,6 +3020,7 @@ function renderAssistantView() {
             <button type="submit" class="btn btn-primary btn-sm">Send</button>
           </form>
         </div>
+      </div>
       </div>
     </div>
   `;
@@ -3118,21 +3138,25 @@ function renderChannelsView() {
     .join('');
 
   els.content.innerHTML = `
-    <div class="sub-header-bar">
-      <div class="sub-header-inner">
-        <div class="sub-header-left">
-          <h1 class="page-title" style="margin:0;">Push Notifications &amp; Webhooks</h1>
-          <span class="tag tag-accent">${enabledCount} Active</span>
-        </div>
-        <div class="sub-header-actions">
-          <button type="button" class="btn btn-primary btn-sm" data-action="save-channels">Save All Channels</button>
+    <div class="page-band">
+      <div class="page-band-inner">
+        <div class="page-band-top">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <h1 class="page-band-title">Notifications &amp; Webhooks</h1>
+            <span class="tag tag-accent">${enabledCount} Active</span>
+          </div>
+          <div class="toolbar-group">
+            <button type="button" class="btn btn-primary btn-sm" data-action="save-channels">Save All Channels</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="content-container view-animate">
-      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(360px, 1fr));gap:18px;">
-        ${cardsHtml}
+    <div class="content-inner">
+      <div class="content-container view-animate">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr));gap:20px;">
+          ${cardsHtml}
+        </div>
       </div>
     </div>
   `;

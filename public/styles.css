@@ -840,6 +840,9 @@ code, pre, .mono { font-family: var(--font-mono); }
   margin: 0 auto;
   width: 100%;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 /* ============================================================
@@ -850,7 +853,7 @@ code, pre, .mono { font-family: var(--font-mono); }
   color: #ffffff;
   border-radius: var(--radius-lg);
   padding: clamp(24px, 3vw, 36px) clamp(24px, 3.2vw, 40px);
-  margin-bottom: 28px;
+  margin-bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -908,7 +911,7 @@ code, pre, .mono { font-family: var(--font-mono); }
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 350px), 1fr));
   gap: 22px;
-  margin-bottom: 28px;
+  margin-bottom: 0;
 }
 
 .form-showcase-card {
