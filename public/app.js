@@ -91,6 +91,7 @@ const state = {
   ],
   assistantDraftForm: null,
   assistantByok: { provider: 'gemini', apiKey: '' },
+  aiChatOpen: false,
   partnerIssuedKey: null,
   partnerClients: [],
 };
@@ -114,6 +115,7 @@ const els = {
   drawer: document.getElementById('drawer'),
   modalBackdrop: document.getElementById('modal-backdrop'),
   modal: document.getElementById('modal'),
+  aiFabRoot: document.getElementById('ai-fab-root'),
   toastContainer: document.getElementById('toast-container'),
 };
 
@@ -308,7 +310,6 @@ function renderTopbar() {
         <nav class="header-nav" aria-label="Partner Primary">
           <button class="header-nav-link ${state.view === 'partner-clients' ? 'active' : ''}" data-nav="partner-clients">Clients &amp; Keys</button>
           <button class="header-nav-link ${state.view === 'forms' || state.view === 'form' ? 'active' : ''}" data-nav="forms">Client Forms</button>
-          <button class="header-nav-link ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Form Builder</button>
         </nav>
         <span class="tag tag-accent" style="white-space:nowrap;">Partner · ${escapeHtml(ws.license_holder || ws.brand_name || 'Agency')}</span>
         <button class="btn btn-ghost btn-sm" style="padding:0 10px;" data-action="logout" title="Sign out">${icons.lock}</button>
@@ -324,7 +325,6 @@ function renderTopbar() {
       <div class="header-right">
         <nav class="header-nav" aria-label="Preview Primary">
           <button class="header-nav-link ${state.view === 'forms' || state.view === 'form' ? 'active' : ''}" data-nav="forms">Forms</button>
-          <button class="header-nav-link ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Assistant</button>
           <button class="header-nav-link ${state.view === 'channels' ? 'active' : ''}" data-nav="channels">Notifications</button>
           <button class="header-nav-link ${state.view === 'workspace' ? 'active' : ''}" data-nav="workspace">Brand</button>
         </nav>
@@ -341,7 +341,6 @@ function renderTopbar() {
     <div class="header-right">
       <nav class="header-nav" aria-label="Primary">
         <button class="header-nav-link ${state.view === 'forms' || state.view === 'form' ? 'active' : ''}" data-nav="forms">Forms</button>
-        <button class="header-nav-link ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Assistant</button>
         <button class="header-nav-link ${state.view === 'channels' ? 'active' : ''}" data-nav="channels">Notifications</button>
         <button class="header-nav-link ${state.view === 'mail' || state.view === 'webhooks' ? 'active' : ''}" data-nav="mail">Activity</button>
         <button class="header-nav-link ${state.view === 'workspace' || state.view === 'setup' ? 'active' : ''}" data-nav="workspace">Brand</button>
@@ -441,15 +440,12 @@ function renderSidebar() {
         ${
           partner
             ? `<button class="tree-form-btn ${state.view === 'partner-clients' ? 'active' : ''}" data-nav="partner-clients">Clients &amp; Keys</button>
-               <button class="tree-form-btn ${state.view === 'forms' ? 'active' : ''}" data-nav="forms">Client Forms</button>
-               <button class="tree-form-btn ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Form Builder</button>`
+               <button class="tree-form-btn ${state.view === 'forms' ? 'active' : ''}" data-nav="forms">Client Forms</button>`
             : isDemoMode()
             ? `<button class="tree-form-btn ${state.view === 'forms' ? 'active' : ''}" data-nav="forms">Forms</button>
-               <button class="tree-form-btn ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Assistant</button>
                <button class="tree-form-btn ${state.view === 'channels' ? 'active' : ''}" data-nav="channels">Notifications</button>
                <button class="tree-form-btn ${state.view === 'workspace' ? 'active' : ''}" data-nav="workspace">Brand</button>`
             : `<button class="tree-form-btn ${state.view === 'forms' ? 'active' : ''}" data-nav="forms">Forms</button>
-               <button class="tree-form-btn ${state.view === 'assistant' ? 'active' : ''}" data-nav="assistant">AI Assistant</button>
                <button class="tree-form-btn ${state.view === 'channels' ? 'active' : ''}" data-nav="channels">Notifications</button>
                <button class="tree-form-btn ${state.view === 'mail' || state.view === 'webhooks' ? 'active' : ''}" data-nav="mail">Activity</button>
                <button class="tree-form-btn ${state.view === 'workspace' || state.view === 'setup' ? 'active' : ''}" data-nav="workspace">Brand</button>`
@@ -2966,41 +2962,61 @@ function launchLivePopoutPreview(formId, mode = 'drawer') {
   document.body.appendChild(script);
 }
 
-function renderAssistantView() {
+function renderAiWidget() {
+  if (!els.aiFabRoot) return;
+  if (!state.authenticated) {
+    els.aiFabRoot.classList.add('hidden');
+    els.aiFabRoot.innerHTML = '';
+    return;
+  }
+
+  els.aiFabRoot.classList.remove('hidden');
+  const partner = isPartnerSession();
   const msgs = state.assistantMessages || [];
   const draft = state.assistantDraftForm;
 
-  els.content.innerHTML = `
-    <div class="page-band">
-      <div class="page-band-inner">
-        <div class="page-band-top">
-          <h1 class="page-band-title">AI Assistant</h1>
-          <div class="toolbar-group">
-            <button type="button" class="btn btn-secondary btn-sm" data-action="open-ai-settings">AI &amp; MCP Settings</button>
-            <button type="button" class="btn btn-ghost btn-sm" data-action="assistant-clear">Clear</button>
+  const sparkleSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8L20 10.7l-5.2 2.4L12 19l-2.8-5.9L4 10.7l6.1-1.9L12 3z"/></svg>`;
+  const closeSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
+
+  const quickChips = partner
+    ? `
+        <button type="button" class="ai-chip" data-assistant-prompt="Create a 2-step roofing quote form asking for suburb, roof type, solar panels, urgency, and phone">Roofing Quote</button>
+        <button type="button" class="ai-chip" data-assistant-prompt="Create a clinic appointment booking form with preferred day, time, and NDIS number">Clinic Booking</button>
+      `
+    : `
+        <button type="button" class="ai-chip" data-assistant-prompt="Create a 2-step roofing quote form asking for suburb, roof type, solar panels, urgency, and phone">Roofing Quote</button>
+        <button type="button" class="ai-chip" data-assistant-prompt="Create a clinic appointment booking form with preferred day, time, and NDIS number">Clinic Booking</button>
+        <button type="button" class="ai-chip" data-assistant-prompt="Give me live form analytics">Analytics</button>
+      `;
+
+  const popupHtml = state.aiChatOpen
+    ? `
+      <section class="ai-chat-popup" role="dialog" aria-label="Build with AI">
+        <div class="ai-chat-header">
+          <div class="ai-chat-title-wrap">
+            <span class="ai-chat-avatar">${sparkleSvg}</span>
+            <div>
+              <div class="ai-chat-title">Build with AI</div>
+              <div class="ai-chat-sub">${partner ? 'Create custom client forms in seconds' : 'Create forms & query analytics'}</div>
+            </div>
+          </div>
+          <div class="ai-chat-header-actions">
+            <button type="button" class="ai-chat-icon-btn" data-action="open-ai-settings" title="MCP & API Key settings">MCP</button>
+            <button type="button" class="ai-chat-icon-btn" data-action="assistant-clear" title="Clear chat">Clear</button>
+            <button type="button" class="ai-chat-icon-btn" style="width:28px;padding:0;" data-action="close-ai-chat" aria-label="Close">${closeSvg}</button>
           </div>
         </div>
-      </div>
-    </div>
 
-    <div class="content-inner">
-      <div class="content-container view-animate" style="max-width:780px;">
-        <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 230px);min-height:460px;overflow:hidden;">
-        <div id="assistant-chat-log" style="flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:12px;">
+        <div id="assistant-chat-log" class="ai-chat-log">
           ${msgs
-            .map(
-              (m) => `
-              <div style="align-self:${m.role === 'user' ? 'flex-end' : 'flex-start'};max-width:82%;padding:12px 16px;border-radius:${m.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};font-size:14px;line-height:1.58;white-space:pre-wrap;background:${m.role === 'user' ? 'var(--accent)' : 'var(--bg-subtle)'};color:${m.role === 'user' ? '#ffffff' : 'var(--text-primary)'};">${escapeHtml(m.text)}</div>
-            `
-            )
+            .map((m) => `<div class="ai-msg ${m.role === 'user' ? 'user' : 'assistant'}">${escapeHtml(m.text)}</div>`)
             .join('')}
-
           ${
             draft
-              ? `<div style="align-self:flex-start;width:100%;max-width:82%;padding:14px 16px;border-radius:14px;background:var(--accent-soft);border:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+              ? `<div class="ai-draft-card">
                   <div>
-                    <strong style="font-size:14px;color:var(--text-primary);">${escapeHtml(draft.name)}</strong>
-                    <div class="cell-secondary">${draft.fields.length} fields · ${draft.multi_step ? '2-Step Layout' : 'Single-Step Layout'}</div>
+                    <strong style="font-size:13.5px;color:var(--ink-primary);">${escapeHtml(draft.name)}</strong>
+                    <div class="cell-secondary" style="font-size:12px;">${draft.fields.length} fields · ${draft.multi_step ? '2-Step' : 'Single-Step'}</div>
                   </div>
                   <button type="button" class="btn btn-primary btn-sm" data-action="assistant-create-draft">Create Form</button>
                 </div>`
@@ -3008,22 +3024,34 @@ function renderAssistantView() {
           }
         </div>
 
-        <div style="padding:14px 18px;border-top:1px solid var(--border-subtle);background:var(--bg-surface);">
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
-            <button type="button" class="btn btn-secondary btn-sm" style="height:28px;font-size:12px;padding:0 12px;" data-assistant-prompt="Create a 2-step roofing quote form asking for suburb, roof type, solar panels, urgency, and phone">Roofing Quote Form</button>
-            <button type="button" class="btn btn-secondary btn-sm" style="height:28px;font-size:12px;padding:0 12px;" data-assistant-prompt="Create a clinic appointment booking form with preferred day, time, and NDIS number">Clinic Booking Form</button>
-            <button type="button" class="btn btn-secondary btn-sm" style="height:28px;font-size:12px;padding:0 12px;" data-assistant-prompt="Give me live form analytics">Form Analytics</button>
-            <button type="button" class="btn btn-secondary btn-sm" style="height:28px;font-size:12px;padding:0 12px;" data-assistant-prompt="Show unread enquiries in my inbox">Unread Enquiries</button>
-          </div>
+        <div class="ai-chat-footer">
+          <div class="ai-quick-chips">${quickChips}</div>
           <form id="assistant-chat-form" style="display:flex;gap:8px;">
-            <input class="input" id="assistant-input" name="message" placeholder="Ask me to build a form, search your inbox, or show analytics..." required style="flex:1;" />
-            <button type="submit" class="btn btn-primary btn-sm">Send</button>
+            <input class="input" id="assistant-input" name="message" placeholder="Describe the form you want to build..." required style="flex:1;height:38px;font-size:13.5px;" />
+            <button type="submit" class="btn btn-primary btn-sm" style="height:38px;padding:0 16px;">Send</button>
           </form>
         </div>
-      </div>
-      </div>
-    </div>
+      </section>
+    `
+    : '';
+
+  els.aiFabRoot.innerHTML = `
+    ${popupHtml}
+    <button type="button" class="ai-fab-btn ${state.aiChatOpen ? 'is-open' : ''}" data-action="toggle-ai-chat" aria-label="${state.aiChatOpen ? 'Close AI chat' : 'Build with AI'}">
+      ${state.aiChatOpen ? closeSvg : `<span class="ai-fab-dot"></span>${sparkleSvg}<span>Build with AI</span>`}
+    </button>
   `;
+
+  if (state.aiChatOpen) {
+    const log = document.getElementById('assistant-chat-log');
+    if (log) log.scrollTop = log.scrollHeight;
+  }
+}
+
+function renderAssistantView() {
+  state.aiChatOpen = true;
+  renderFormsOverview();
+  renderAiWidget();
 }
 
 function openAiSettingsModal() {
@@ -3168,6 +3196,7 @@ function renderLoginScreen(errorMessage = '') {
   els.sidebar.classList.add('hidden');
   els.sidebarRailToggle?.classList.add('hidden');
   els.topbar.classList.add('hidden');
+  els.aiFabRoot?.classList.add('hidden');
   els.content.style.padding = '0';
   els.content.style.maxWidth = 'none';
 
@@ -3341,6 +3370,7 @@ function render() {
 
   renderTopbar();
   renderSidebar();
+  renderAiWidget();
 
   if (state.view === 'partner-clients') renderPartnerClientsView();
   else if (state.view === 'forms') renderFormsOverview();
@@ -3393,6 +3423,26 @@ document.addEventListener('click', async (e) => {
     const wrap = document.querySelector('.project-heading-wrap');
     wrap?.classList.remove('open');
     wrap?.querySelector('.heading-switcher')?.setAttribute('aria-expanded', 'false');
+  }
+
+  if (target.closest('[data-action="toggle-ai-chat"]')) {
+    state.aiChatOpen = !state.aiChatOpen;
+    renderAiWidget();
+    if (state.aiChatOpen) document.getElementById('assistant-input')?.focus();
+    return;
+  }
+
+  if (target.closest('[data-action="open-ai-chat"]')) {
+    state.aiChatOpen = true;
+    renderAiWidget();
+    document.getElementById('assistant-input')?.focus();
+    return;
+  }
+
+  if (target.closest('[data-action="close-ai-chat"]')) {
+    state.aiChatOpen = false;
+    renderAiWidget();
+    return;
   }
 
   if (target.closest('[data-action="open-ai-settings"]')) {
@@ -3494,7 +3544,7 @@ document.addEventListener('click', async (e) => {
   if (target.closest('[data-action="assistant-clear"]')) {
     state.assistantMessages = state.assistantMessages.slice(0, 1);
     state.assistantDraftForm = null;
-    render();
+    renderAiWidget();
     return;
   }
 
@@ -3510,6 +3560,7 @@ document.addEventListener('click', async (e) => {
         multi_step: draft.multi_step,
       });
       state.assistantDraftForm = null;
+      state.aiChatOpen = false;
       await refreshBootstrap();
       await openForm(created.id, 'builder');
       showToast(`Created "${created.name}"`);
@@ -3946,6 +3997,12 @@ document.addEventListener('click', async (e) => {
   const navBtn = target.closest('[data-nav]');
   if (navBtn) {
     els.app.classList.remove('sidebar-open');
+    if (navBtn.dataset.nav === 'assistant') {
+      state.aiChatOpen = true;
+      renderAiWidget();
+      document.getElementById('assistant-input')?.focus();
+      return;
+    }
     await switchView(navBtn.dataset.nav);
     return;
   }
@@ -4396,21 +4453,19 @@ document.addEventListener('submit', async (e) => {
     const inp = document.getElementById('assistant-input');
     const msg = (inp?.value || '').trim();
     if (!msg) return;
-    state.assistantByok.provider = document.getElementById('byok-provider')?.value || 'gemini';
-    state.assistantByok.apiKey = document.getElementById('byok-key')?.value?.trim() || '';
+    state.assistantByok.provider = document.getElementById('byok-provider')?.value || state.assistantByok.provider || 'gemini';
+    state.assistantByok.apiKey = document.getElementById('byok-key')?.value?.trim() || state.assistantByok.apiKey || '';
     state.assistantMessages.push({ role: 'user', text: msg });
     if (inp) inp.value = '';
-    render();
+    renderAiWidget();
     try {
       const res = await api.askAssistant(msg, state.assistantByok);
       state.assistantMessages.push({ role: 'assistant', text: res.reply || 'Done.' });
       state.assistantDraftForm = res.draftForm || null;
-      render();
-      const log = document.getElementById('assistant-chat-log');
-      if (log) log.scrollTop = log.scrollHeight;
+      renderAiWidget();
     } catch (err) {
       state.assistantMessages.push({ role: 'assistant', text: 'Error: ' + err.message });
-      render();
+      renderAiWidget();
     }
     return;
   }
@@ -4693,6 +4748,10 @@ document.addEventListener('keydown', (e) => {
       wrap?.classList.remove('open');
       wrap?.querySelector('.heading-switcher')?.setAttribute('aria-expanded', 'false');
     }
+    if (state.aiChatOpen) {
+      state.aiChatOpen = false;
+      renderAiWidget();
+    }
     closeDrawer();
     closeModal();
   } else if (e.key === '[' && !e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -4741,7 +4800,8 @@ async function init() {
   const requestedView = params.get('view');
   const requestedForm = params.get('form');
   if (requestedView === 'assistant') {
-    state.view = 'assistant';
+    state.aiChatOpen = true;
+    if (isPartnerSession()) state.view = 'partner-clients';
     render();
   } else if (requestedForm && state.forms.some((f) => f.id === requestedForm)) {
     await openForm(requestedForm);
