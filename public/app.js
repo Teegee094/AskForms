@@ -700,9 +700,6 @@ function renderFormWorkspace() {
         <div class="page-band-top">
           <h1 class="page-band-title">${escapeHtml(f.name)}</h1>
           <div class="toolbar-group">
-            <button class="btn btn-secondary" data-copy="${escapeHtml(`${state.baseUrl}/embed/${f.id}`)}" title="Copy shareable form link">
-              ${icons.copy} Copy Link
-            </button>
             <button type="button" class="btn btn-secondary" data-archive-form="${escapeHtml(f.id)}" data-target-archive="${f.is_archived ? '0' : '1'}">
               ${f.is_archived ? `${icons.restore} Restore` : `${icons.archive} Archive`}
             </button>
@@ -930,34 +927,30 @@ function renderFormBuilderTab(f) {
                   </div>
                 </div>
 
-                ${
-                  isSelected
-                    ? `<div class="dnd-card-editor" data-stop-prop="1">
-                         <div class="form-grid-2" style="gap:8px;">
-                           <input class="input" style="height:34px;font-size:13px;" data-bf-prop="label" data-bf-idx="${idx}" value="${escapeHtml(field.label || '')}" placeholder="Question / Field label" />
-                           <select class="select" style="height:34px;font-size:13px;" data-bf-prop="type" data-bf-idx="${idx}">
-                             <option value="text" ${field.type === 'text' ? 'selected' : ''}>Short text</option>
-                             <option value="email" ${field.type === 'email' ? 'selected' : ''}>Email</option>
-                             <option value="tel" ${field.type === 'tel' ? 'selected' : ''}>Phone</option>
-                             <option value="url" ${field.type === 'url' ? 'selected' : ''}>Website URL</option>
-                             <option value="select" ${field.type === 'select' ? 'selected' : ''}>Dropdown</option>
-                             <option value="checklist" ${field.type === 'checklist' ? 'selected' : ''}>Checklist (tick multiple)</option>
-                             <option value="checkbox" ${field.type === 'checkbox' ? 'selected' : ''}>Single checkbox</option>
-                             <option value="textarea" ${field.type === 'textarea' ? 'selected' : ''}>Long text</option>
-                             <option value="date" ${field.type === 'date' ? 'selected' : ''}>Date</option>
-                             <option value="file" ${field.type === 'file' ? 'selected' : ''}>File upload</option>
-                           </select>
-                         </div>
-                         ${
-                           field.type === 'select' || field.type === 'checklist'
-                             ? `<input class="input" style="height:34px;font-size:13px;" data-bf-prop="options" data-bf-idx="${idx}" value="${escapeHtml(Array.isArray(field.options) ? field.options.join(', ') : (field.options || ''))}" placeholder="Comma-separated choices, e.g. Repair, Install, Maintenance" />`
-                             : field.type !== 'file' && field.type !== 'date' && field.type !== 'checkbox'
-                             ? `<input class="input" style="height:34px;font-size:13px;" data-bf-prop="placeholder" data-bf-idx="${idx}" value="${escapeHtml(field.placeholder || '')}" placeholder="Hint text inside input (optional)" />`
-                             : ''
-                         }
-                       </div>`
-                    : ''
-                }
+                <div class="dnd-card-editor" data-stop-prop="1">
+                  <div class="form-grid-2" style="gap:8px;">
+                    <input class="input" style="height:34px;font-size:13px;" data-bf-prop="label" data-bf-idx="${idx}" value="${escapeHtml(field.label || '')}" placeholder="Question / Field label" />
+                    <select class="select" style="height:34px;font-size:13px;" data-bf-prop="type" data-bf-idx="${idx}">
+                      <option value="text" ${field.type === 'text' ? 'selected' : ''}>Short text</option>
+                      <option value="email" ${field.type === 'email' ? 'selected' : ''}>Email</option>
+                      <option value="tel" ${field.type === 'tel' ? 'selected' : ''}>Phone</option>
+                      <option value="url" ${field.type === 'url' ? 'selected' : ''}>Website URL</option>
+                      <option value="select" ${field.type === 'select' ? 'selected' : ''}>Dropdown</option>
+                      <option value="checklist" ${field.type === 'checklist' ? 'selected' : ''}>Checklist (tick multiple)</option>
+                      <option value="checkbox" ${field.type === 'checkbox' ? 'selected' : ''}>Single checkbox</option>
+                      <option value="textarea" ${field.type === 'textarea' ? 'selected' : ''}>Long text</option>
+                      <option value="date" ${field.type === 'date' ? 'selected' : ''}>Date</option>
+                      <option value="file" ${field.type === 'file' ? 'selected' : ''}>File upload</option>
+                    </select>
+                  </div>
+                  ${
+                    field.type === 'select' || field.type === 'checklist'
+                      ? `<input class="input" style="height:34px;font-size:13px;" data-bf-prop="options" data-bf-idx="${idx}" value="${escapeHtml(Array.isArray(field.options) ? field.options.join(', ') : (field.options || ''))}" placeholder="Comma-separated choices, e.g. Repair, Install, Maintenance" />`
+                      : field.type !== 'file' && field.type !== 'date' && field.type !== 'checkbox'
+                      ? `<input class="input" style="height:34px;font-size:13px;" data-bf-prop="placeholder" data-bf-idx="${idx}" value="${escapeHtml(field.placeholder || '')}" placeholder="Hint text inside input (optional)" />`
+                      : ''
+                  }
+                </div>
               </div>
             `;
           })
@@ -1270,6 +1263,16 @@ function renderFormIntegrationTab(f) {
   const endpoint = `${state.baseUrl}/f/${f.id}`;
   const snippet = getIntegrationSnippet(f, state.snippetLang);
   const aiPrompt = buildAiAssistantPrompt(f);
+  const demo = isDemoMode();
+  const snippetGuides = {
+    popout: 'Paste this single tag right before </body> on your website (WordPress, Webflow, Squarespace, Shopify, or HTML). It automatically adds your floating button and pop-out form.',
+    embed: 'Paste this into an HTML / Embed block on the exact page where you want the form to appear inline.',
+    html: 'Paste this standard HTML form anywhere in your page markup — works with zero JavaScript.',
+    fetch: 'Add this JavaScript handler to submit your existing custom-styled form via AJAX without reloading the page.',
+    react: 'Use this submit handler inside any React or Next.js form component.',
+    curl: 'Run this command in your terminal to test a live JSON submission directly to your form.',
+    cloudflare: 'Optional: drop into functions/f/[formId].js if you want to proxy submissions through your own Cloudflare Pages site.',
+  };
 
   return `
     <div class="split-grid-wide">
@@ -1281,28 +1284,30 @@ function renderFormIntegrationTab(f) {
               <button type="button" class="btn btn-primary btn-sm" data-test-popout="${escapeHtml(f.id)}" data-test-mode="popover">${icons.popout} Chat Pop-Out</button>
               <button type="button" class="btn btn-secondary btn-sm" data-test-popout="${escapeHtml(f.id)}" data-test-mode="drawer">Slide-Over Drawer</button>
               ${
-                isDemoMode()
+                demo
                   ? `<button type="button" class="btn btn-secondary btn-sm" data-open-inline-preview="${escapeHtml(f.id)}">Inline Preview</button>`
                   : `<a class="btn btn-secondary btn-sm" href="/embed/${encodeURIComponent(f.id)}" target="_blank" rel="noopener">Inline ${icons.external}</a>`
               }
             </div>
           </div>
           <div class="card-padded">
-            <p class="cell-secondary" style="margin:0 0 10px;font-size:13px;">Choose <strong>one</strong> embed option below and paste it into your website. You do not need to use multiple tabs.</p>
-            <div class="endpoint-box">
-              <span><strong style="color:var(--accent);font-weight:700;">Form Link</strong> ${escapeHtml(`${state.baseUrl}/embed/${f.id}`)}</span>
-              <button class="btn btn-secondary btn-sm" data-copy="${escapeHtml(`${state.baseUrl}/embed/${f.id}`)}">${icons.copy} Copy</button>
-            </div>
+            <p class="cell-secondary" style="margin:0;font-size:13px;">
+              ${
+                demo
+                  ? 'You are in Preview Mode. Test your form using the buttons above, or buy a lifetime license to publish live embed code for your website.'
+                  : 'Choose <strong>one</strong> embed option below and paste it into your website. You do not need to use multiple tabs.'
+              }
+            </p>
           </div>
         </div>
 
         <div class="card">
           <div class="card-section-header">
-            <h2 class="card-section-label">Embed & Code Examples</h2>
-            <button class="btn btn-secondary btn-sm" data-copy-snippet="1">${icons.copy} Copy snippet</button>
+            <h2 class="card-section-label">Embed &amp; Code Snippets</h2>
+            <button class="btn btn-secondary btn-sm" data-copy-snippet="1">${icons.copy} Copy code</button>
           </div>
           <div class="card-padded">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
               <div class="filter-pills">
                 <button class="filter-pill ${state.snippetLang === 'popout' ? 'active' : ''}" data-snippet="popout">Popout (Cart / Chat)</button>
                 <button class="filter-pill ${state.snippetLang === 'embed' ? 'active' : ''}" data-snippet="embed">Inline Iframe</button>
@@ -1320,6 +1325,9 @@ function renderFormIntegrationTab(f) {
                     </div>`
                   : ''
               }
+            </div>
+            <div style="padding:10px 14px;border-radius:10px;background:var(--bg-canvas);border:1px solid var(--border-subtle);font-size:13px;color:var(--ink-secondary);margin-bottom:12px;line-height:1.45;">
+              <strong style="color:var(--ink-primary);">How to install:</strong> ${escapeHtml(snippetGuides[state.snippetLang] || snippetGuides.popout)}
             </div>
             <pre class="code-block" id="integration-code">${escapeHtml(snippet)}</pre>
           </div>
