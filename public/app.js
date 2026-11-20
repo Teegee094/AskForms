@@ -793,6 +793,88 @@ const ENQUIRY_TEMPLATES = {
   },
 };
 
+function buildLiveFormPreviewDoc(form, fieldsOverride = null) {
+  const ws = state.workspace || {};
+  const accent = ws.accent_color || '#14383e';
+  const accentText = contrastTextForHex(accent);
+  const fonts = FONT_TOKENS[ws.font_preset] || FONT_TOKENS.minimal;
+  const radii = RADIUS_TOKENS[ws.radius_preset] || RADIUS_TOKENS.balanced;
+  const fields = Array.isArray(fieldsOverride) ? fieldsOverride : (Array.isArray(form?.fields) ? form.fields : []);
+  const submitLabel = (fieldsOverride ? state.builderSubmitLabel : form?.submit_label) || 'Send enquiry';
+
+  const renderField = (fld) => {
+    const label = escapeHtml(fld.label || fld.name || 'Field');
+    const req = fld.required ? ' *' : '';
+    const ph = escapeHtml(fld.placeholder || '');
+    if (fld.type === 'textarea') {
+      return `<div class="field"><label>${label}${req}</label><textarea placeholder="${ph}" ${fld.required ? 'required' : ''}></textarea></div>`;
+    }
+    if (fld.type === 'select') {
+      const opts = (Array.isArray(fld.options) ? fld.options : String(fld.options || '').split(','))
+        .map((o) => String(o).trim())
+        .filter(Boolean)
+        .map((o) => `<option>${escapeHtml(o)}</option>`)
+        .join('');
+      return `<div class="field"><label>${label}${req}</label><select ${fld.required ? 'required' : ''}>${opts || '<option>Option 1</option>'}</select></div>`;
+    }
+    if (fld.type === 'checklist') {
+      const opts = (Array.isArray(fld.options) ? fld.options : String(fld.options || '').split(','))
+        .map((o) => String(o).trim())
+        .filter(Boolean)
+        .map((o) => `<label class="chk"><input type="checkbox" /> <span>${escapeHtml(o)}</span></label>`)
+        .join('');
+      return `<div class="field"><label>${label}${req}</label><div class="chk-list">${opts || '<label class="chk"><input type="checkbox" /> <span>Option 1</span></label>'}</div></div>`;
+    }
+    if (fld.type === 'checkbox') {
+      return `<div class="field"><label class="chk"><input type="checkbox" ${fld.required ? 'required' : ''} /> <span>${label}${req}</span></label></div>`;
+    }
+    if (fld.type === 'file') {
+      return `<div class="field"><label>${label}${req}</label><input type="file" /></div>`;
+    }
+    const type = ['text', 'email', 'tel', 'url', 'number', 'date'].includes(fld.type) ? fld.type : 'text';
+    return `<div class="field"><label>${label}${req}</label><input type="${type}" placeholder="${ph}" ${fld.required ? 'required' : ''} /></div>`;
+  };
+
+  let fieldsHtml = '';
+  for (let i = 0; i < fields.length; ) {
+    const curr = fields[i];
+    const next = fields[i + 1];
+    if (curr.half && next && next.half) {
+      fieldsHtml += `<div class="grid">${renderField(curr)}${renderField(next)}</div>`;
+      i += 2;
+    } else {
+      fieldsHtml += renderField(curr);
+      i += 1;
+    }
+  }
+
+  return `<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><style>
+    *{box-sizing:border-box}
+    body{margin:0;padding:16px;font-family:${fonts.sans};color:#0f172a;background:transparent}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media(max-width:460px){.grid{grid-template-columns:1fr}}
+    .field{margin-bottom:13px}
+    label{display:block;font-size:12.5px;font-weight:600;margin-bottom:5px;color:#1e293b}
+    .chk{display:flex;align-items:center;gap:8px;font-weight:500;margin:5px 0;cursor:pointer}
+    .chk input{width:15px;height:15px;accent-color:${accent}}
+    input[type=text],input[type=email],input[type=tel],input[type=url],input[type=number],input[type=date],select,textarea{
+      width:100%;padding:9px 12px;border-radius:${radii.md};border:1px solid #cbd5e1;background:#ffffff;color:#0f172a;font:inherit;font-size:13.5px;outline:none
+    }
+    input:focus,select:focus,textarea:focus{border-color:${accent}}
+    textarea{min-height:84px;resize:vertical}
+    button{width:100%;margin-top:4px;padding:11px 20px;border:0;border-radius:${radii.btn};background:${accent};color:${accentText};font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+    button:hover{opacity:.92}
+    .done{text-align:center;padding:34px 16px}
+    .done h3{margin:0 0 8px;font-family:${fonts.display};font-size:20px;color:#0f172a}
+    .done p{margin:0;font-size:13.5px;color:#64748b;line-height:1.5}
+  </style></head><body>
+    <form onsubmit="event.preventDefault();this.outerHTML='<div class=done><h3>${escapeHtml(ws.thanks_heading || 'Enquiry received')}</h3><p>${escapeHtml(ws.thanks_body || 'Thanks for reaching out. Our team will get back to you shortly.')}</p></div>'">
+      ${fieldsHtml || '<p style="color:#64748b;font-size:13px;">Add fields on the left to preview your form.</p>'}
+      <button type="submit">${escapeHtml(submitLabel)}</button>
+    </form>
+  </body></html>`;
+}
+
 function renderFormBuilderTab(f) {
   const fields = state.builderFields || [];
 
@@ -897,8 +979,8 @@ function renderFormBuilderTab(f) {
             <button type="button" class="btn btn-secondary btn-sm" data-form-tab="integration">Get Embed Code</button>
           </div>
         </div>
-        <div style="background:var(--bg-canvas);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px;">
-          <iframe class="embed-preview-frame" src="/embed/${encodeURIComponent(f.id)}?v=${state.embedVersion}" title="Embedded enquiry form preview"></iframe>
+        <div style="background:var(--bg-canvas);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px;min-height:460px;">
+          <iframe class="embed-preview-frame" style="width:100%;min-height:460px;border:0;background:#ffffff;border-radius:10px;" srcdoc="${escapeHtml(buildLiveFormPreviewDoc(f, state.builderFields))}" title="Embedded enquiry form preview"></iframe>
         </div>
       </div>
     </div>
@@ -2369,358 +2451,258 @@ function renderWorkspaceView() {
   const accentSwatches = [
     { hex: '#14383e', label: 'Deep Petrol' },
     { hex: '#1d4f56', label: 'Ocean Teal' },
-    { hex: '#4fd1c5', label: 'Mint Turquoise' },
-    { hex: '#f6ad55', label: 'Warm Amber' },
-    { hex: '#718096', label: 'Slate Grey' },
-    { hex: '#1e3a5f', label: 'Cobalt Ink' },
+    { hex: '#0f766e', label: 'Pine' },
+    { hex: '#2563eb', label: 'Cobalt' },
+    { hex: '#7c3aed', label: 'Indigo' },
+    { hex: '#c2410c', label: 'Terracotta' },
+    { hex: '#111827', label: 'Obsidian' },
   ];
   const bgSwatches = [
-    { hex: '#f7fafc', label: 'Off-White' },
+    { hex: '#f7fafc', label: 'Cool White' },
+    { hex: '#f7f5f2', label: 'Warm Alabaster' },
     { hex: '#ffffff', label: 'Pure White' },
-    { hex: '#f1f5f9', label: 'Cool Slate' },
-    { hex: '#f5f4f0', label: 'Warm Alabaster' },
+    { hex: '#f3f6f4', label: 'Soft Sage' },
+    { hex: '#f8fafc', label: 'Slate Mist' },
   ];
-
-  const firstFormId = state.forms[0]?.id || '';
-  const hasDemoForms = state.forms.some((f) => ['audit-intake', 'sintiro-contact', 'centella-enquiry', 'teagee-brief'].includes(f.id));
-  const isCustomBrand = Boolean(ws.brand_name && ws.brand_name !== 'AskForms') || Boolean(ws.website_url);
-  const isEmailLive = ws.email_provider === 'resend' && ws.has_resend_key;
-  const readyCount = [isCustomBrand, isEmailLive, Boolean(ws.owner_pin_enabled && ws.auth_enabled), !hasDemoForms].filter(Boolean).length;
+  const demo = isDemoMode();
+  const activeAccent = ws.accent_color || '#14383e';
 
   els.content.innerHTML = `
     <div class="page-band has-tabs">
       <div class="page-band-inner">
         <div class="page-band-top">
-          <h1 class="page-band-title">Brand & Setup</h1>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <h1 class="page-band-title">Settings</h1>
+            ${
+              ws.license?.isLicensed && !demo
+                ? `<span class="tag tag-success">Licensed · ${escapeHtml(ws.license.licensedDomain)}</span>`
+                : ''
+            }
+          </div>
           <div class="toolbar-group">
-            <button type="button" class="btn btn-secondary" data-action="export-brand-kit">${icons.download} Brand Kit</button>
-            <label class="btn btn-secondary" style="cursor:pointer;">
+            <button type="button" class="btn btn-secondary btn-sm" data-action="export-brand-kit">${icons.download} Export Brand Kit</button>
+            <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
               Import
               <input type="file" id="import-brand-input" accept="application/json,.json" style="display:none;" />
             </label>
-            <a class="btn btn-secondary" href="/api/workspace/backup.json">${icons.download} Full Backup</a>
           </div>
         </div>
 
         <div class="underline-tabs" role="tablist">
           <button class="underline-tab" data-nav="channels">Notifications</button>
           <button class="underline-tab active" data-nav="workspace">Brand &amp; Hosting</button>
-          ${isDemoMode() ? '' : `<button class="underline-tab" data-nav="setup">Setup Wizard</button>`}
+          ${demo ? '' : `<button class="underline-tab" data-nav="setup">Setup Wizard</button>`}
         </div>
       </div>
     </div>
 
     <div class="content-inner">
       <div class="content-container view-animate">
-        <div class="card card-padded" style="margin-bottom:22px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px;">
-            <h2 class="section-title" style="margin:0;">First-Client Production Readiness</h2>
-            <div class="toolbar-group">
-              <span class="tag ${readyCount === 4 ? 'tag-success' : 'tag-accent'}">${readyCount} of 4 Ready</span>
-              ${hasDemoForms ? `<button type="button" class="btn btn-secondary btn-sm" data-action="clear-demo-data">${icons.trash} Clear Demo Forms</button>` : ''}
-              <button type="button" class="btn btn-primary btn-sm" data-nav="setup">${icons.wizard} Run 4-Step Client Wizard</button>
-            </div>
-          </div>
-          <div class="utility-strip">
-            <div class="wf-rule-card">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                <span class="cell-primary" style="font-size:13.5px;">1. Client Brand & Domain</span>
-                <span class="tag ${isCustomBrand ? 'tag-success' : 'tag-warning'}">${isCustomBrand ? 'Configured' : 'Default'}</span>
+        <form id="workspace-settings-form" style="display:grid;grid-template-columns:minmax(0, 1.2fr) minmax(300px, 0.8fr);gap:24px;align-items:start;">
+          <div style="display:flex;flex-direction:column;gap:20px;">
+            <section class="card card-padded">
+              <div style="margin-bottom:18px;">
+                <h2 class="section-title" style="margin:0;">Brand Identity</h2>
+                <p class="cell-secondary" style="margin:3px 0 0;font-size:13px;">Your business name, logo, and contact details shown across hosted forms and receipts.</p>
               </div>
-              <div class="cell-secondary" style="font-size:12px;">Set client name, logo, accent colour, and <span class="mono">PUBLIC_URL</span> for embed links.</div>
-            </div>
-            <div class="wf-rule-card">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                <span class="cell-primary" style="font-size:13.5px;">2. Live Email Delivery</span>
-                <span class="tag ${isEmailLive ? 'tag-success' : 'tag-warning'}">${isEmailLive ? 'Resend Live' : 'Local Preview'}</span>
-              </div>
-              <div class="cell-secondary" style="font-size:12px;">Switch provider to <strong>Resend HTTP API</strong> and paste your free <span class="mono">re_...</span> key below.</div>
-            </div>
-            <div class="wf-rule-card">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                <span class="cell-primary" style="font-size:13.5px;">3. Security & Owner PIN</span>
-                <span class="tag ${ws.owner_pin_enabled && ws.auth_enabled ? 'tag-success' : 'tag-warning'}">${ws.owner_pin_enabled && ws.auth_enabled ? 'Locked' : 'Open Setup'}</span>
-              </div>
-              <div class="cell-secondary" style="font-size:12px;">Set a 6-digit Owner PIN for <span class="mono">/manage</span> and an Admin Password for <span class="mono">/</span>.</div>
-            </div>
-            <div class="wf-rule-card">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                <span class="cell-primary" style="font-size:13.5px;">4. Demo Forms Cleanup</span>
-                <span class="tag ${!hasDemoForms ? 'tag-success' : 'tag-warning'}">${!hasDemoForms ? 'Clean' : '4 Demo Forms'}</span>
-              </div>
-              <div class="cell-secondary" style="font-size:12px;">Archive, delete, or click <strong>Clear Demo Forms</strong> before handing off to your client.</div>
-            </div>
-          </div>
-        </div>
 
-        <div class="card card-padded" style="margin-bottom:22px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
-            <div>
-              <h2 class="section-title" style="margin:0;">Single-Domain License &amp; Activation (1 Key = 1 Website)</h2>
-              <div class="cell-secondary">
-                ${
-                  ws.license?.isLicensed
-                    ? `Verified Ed25519 Lifetime License · Locked exclusively to <strong>${escapeHtml(ws.license.licensedDomain)}</strong> (${escapeHtml(ws.license.holder)})`
-                    : `Live Preview Mode active (${ws.license?.previewRemaining ?? 5} of ${ws.license?.previewLimit ?? 10} test enquiries remaining). Enter a signed ASK1 key to lock to your client's production domain.`
-                }
+              <div class="form-grid-2">
+                <div class="field-group">
+                  <label class="field-label" for="ws-brand">Brand name</label>
+                  <input class="input" id="ws-brand" name="brand_name" value="${escapeHtml(ws.brand_name)}" required />
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="ws-website">Website URL</label>
+                  <input class="input" id="ws-website" name="website_url" type="url" value="${escapeHtml(ws.website_url)}" placeholder="https://yourbusiness.com.au" />
+                </div>
               </div>
-            </div>
-            <div class="toolbar-group">
-              <span class="tag ${ws.license?.isLicensed ? 'tag-success' : 'tag-warning'}">
-                ${ws.license?.isLicensed ? `Licensed · ${escapeHtml(ws.license.licensedDomain)}` : 'Preview Mode'}
-              </span>
-              <a class="btn btn-secondary btn-sm" href="/site" target="_blank" rel="noopener">askforms.app Landing &amp; Key Generator ${icons.external}</a>
-            </div>
-          </div>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <input class="input mono" id="ws-license-key-input" placeholder="${ws.has_license_key ? `Active (${escapeHtml(ws.license_key_preview)}) — paste new ASK1 key to replace` : 'Paste single-domain license key (ASK1.eyJ...)'}" style="flex:1;min-width:260px;" />
-            <button type="button" class="btn btn-primary btn-sm" data-action="activate-license">Activate Domain Key</button>
-            ${ws.has_license_key ? `<button type="button" class="btn btn-ghost btn-sm" data-action="remove-license">Switch to Preview Mode</button>` : ''}
-          </div>
-        </div>
 
-        ${
-          !isDemoMode()
-            ? `<div class="card card-padded" style="margin-bottom:22px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-                  <div>
-                    <h2 class="section-title" style="margin:0;">Partner &amp; Admin Key Generator ($0 Cost)</h2>
-                    <div class="cell-secondary">Generate domain-locked client keys for your own sites or partner clients at $0 cost without overwriting this workspace.</div>
+              <div class="form-grid-2">
+                <div class="field-group">
+                  <label class="field-label" for="ws-support">Support email</label>
+                  <input class="input" id="ws-support" name="support_email" type="email" value="${escapeHtml(ws.support_email)}" placeholder="hello@yourbusiness.com.au" />
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="ws-holder">Account holder</label>
+                  <input class="input" id="ws-holder" name="license_holder" value="${escapeHtml(ws.license_holder)}" placeholder="Your Business Pty Ltd" />
+                </div>
+              </div>
+
+              <div class="field-group" style="margin-bottom:0;">
+                <label class="field-label">Brand logo</label>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+                    Upload Logo
+                    <input type="file" id="ws-logo-file" accept="image/svg+xml,image/png,image/jpeg,image/webp" style="display:none;" />
+                  </label>
+                  <input class="input" id="ws-logo-url" name="logo_url" value="${escapeHtml(ws.logo_url)}" placeholder="Or paste image URL..." style="flex:1;min-width:180px;" />
+                  ${ws.logo_url ? `<button type="button" class="btn btn-ghost btn-sm" data-action="remove-logo">Remove</button>` : ''}
+                </div>
+              </div>
+            </section>
+
+            <section class="card card-padded">
+              <div style="margin-bottom:18px;">
+                <h2 class="section-title" style="margin:0;">Appearance</h2>
+                <p class="cell-secondary" style="margin:3px 0 0;font-size:13px;">Colours, typography, and corner style applied to all pop-out and embedded forms.</p>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="field-group">
+                  <label class="field-label" for="ws-accent">Primary accent colour</label>
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <input type="color" class="color-picker-native" id="ws-accent-picker" value="${escapeHtml(activeAccent)}" aria-label="Pick accent colour" />
+                    <div class="swatch-row">
+                      ${accentSwatches
+                        .map((sw) => `<button type="button" class="swatch-btn ${activeAccent.toLowerCase() === sw.hex ? 'active' : ''}" style="background:${sw.hex};" data-swatch="${sw.hex}" title="${sw.label}" aria-label="${sw.label}"></button>`)
+                        .join('')}
+                    </div>
+                    <input class="input mono" id="ws-accent" name="accent_color" value="${escapeHtml(activeAccent)}" style="width:96px;" pattern="^#[0-9a-fA-F]{6}$" />
                   </div>
-                  <span class="tag tag-accent">Partner Only</span>
                 </div>
-                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                  <input class="input mono" id="partner-key-domain" placeholder="clientwebsite.com.au" style="flex:1;min-width:200px;" />
-                  <input class="input" id="partner-key-holder" placeholder="Client Business Name" style="flex:1;min-width:200px;" />
-                  <button type="button" class="btn btn-primary btn-sm" data-action="partner-mint-key">Generate Client Key ($0)</button>
+
+                <div class="field-group">
+                  <label class="field-label" for="ws-bg">Page canvas colour</label>
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <input type="color" class="color-picker-native" id="ws-bg-picker" value="${escapeHtml(ws.bg_color || '#f7fafc')}" aria-label="Pick background colour" />
+                    <div class="swatch-row">
+                      ${bgSwatches
+                        .map((sw) => `<button type="button" class="swatch-btn swatch-btn-light ${(ws.bg_color || '').toLowerCase() === sw.hex ? 'active' : ''}" style="background:${sw.hex};" data-bg-swatch="${sw.hex}" title="${sw.label}" aria-label="${sw.label}"></button>`)
+                        .join('')}
+                    </div>
+                    <input class="input mono" id="ws-bg" name="bg_color" value="${escapeHtml(ws.bg_color || '#f7fafc')}" style="width:96px;" pattern="^#[0-9a-fA-F]{6}$" />
+                  </div>
                 </div>
-                ${
-                  state.partnerIssuedKey
-                    ? `<div style="margin-top:14px;padding:12px 14px;border-radius:10px;background:var(--accent-soft);border:1px solid var(--border-subtle);">
-                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
-                          <strong style="font-size:13px;color:var(--text-primary);">Client Key Minted for ${escapeHtml(state.partnerIssuedKey.domain)}</strong>
-                          <button type="button" class="btn btn-secondary btn-sm" data-copy="${escapeHtml(state.partnerIssuedKey.key)}">Copy Key</button>
-                        </div>
-                        <pre class="mono" style="margin:0;font-size:11.5px;white-space:pre-wrap;word-break:break-all;color:var(--text-primary);">${escapeHtml(state.partnerIssuedKey.key)}</pre>
-                      </div>`
-                    : ''
-                }
-              </div>`
-            : ''
-        }
-
-        <form id="workspace-settings-form" style="display:flex;flex-direction:column;gap:22px;">
-      <div class="split-grid">
-        <div class="card card-padded">
-          <h2 class="section-title">Brand identity</h2>
-          <div class="form-grid-2">
-            <div class="field-group">
-              <label class="field-label" for="ws-brand">Brand name</label>
-              <input class="input" id="ws-brand" name="brand_name" value="${escapeHtml(ws.brand_name)}" required />
-            </div>
-            <div class="field-group">
-              <label class="field-label" for="ws-holder">License holder</label>
-              <input class="input" id="ws-holder" name="license_holder" value="${escapeHtml(ws.license_holder)}" placeholder="Client Business Pty Ltd" />
-            </div>
-          </div>
-
-          <div class="form-grid-2">
-            <div class="field-group">
-              <label class="field-label" for="ws-website">Website URL</label>
-              <input class="input" id="ws-website" name="website_url" type="url" value="${escapeHtml(ws.website_url)}" placeholder="https://yourcompany.com.au" />
-            </div>
-            <div class="field-group">
-              <label class="field-label" for="ws-support">Support email</label>
-              <input class="input" id="ws-support" name="support_email" type="email" value="${escapeHtml(ws.support_email)}" placeholder="hello@yourcompany.com.au" />
-            </div>
-          </div>
-
-          <div class="field-group">
-            <label class="field-label">Brand logo</label>
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
-                Upload SVG / PNG
-                <input type="file" id="ws-logo-file" accept="image/svg+xml,image/png,image/jpeg,image/webp" style="display:none;" />
-              </label>
-              <a class="btn btn-secondary btn-sm" href="/brand/askforms-logo.svg" download="askforms-logo.svg">${icons.download} Export Logo (.svg)</a>
-              <a class="btn btn-secondary btn-sm" href="/brand/askforms-mark.svg" download="askforms-mark.svg">${icons.download} Export Mark (.svg)</a>
-              <input class="input" id="ws-logo-url" name="logo_url" value="${escapeHtml(ws.logo_url)}" placeholder="Or paste logo URL (/uploads/...)" style="flex:1;min-width:160px;" />
-              ${
-                ws.logo_url
-                  ? `<button type="button" class="btn btn-ghost btn-sm" data-action="remove-logo">Remove</button>`
-                  : ''
-              }
-            </div>
-          </div>
-
-          <div class="field-group">
-            <label class="field-label" for="ws-accent">Primary accent colour</label>
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <input type="color" class="color-picker-native" id="ws-accent-picker" value="${escapeHtml(ws.accent_color || '#095c4f')}" aria-label="Pick accent colour" />
-              <div class="swatch-row">
-                ${accentSwatches
-                  .map(
-                    (sw) => `<button type="button" class="swatch-btn ${ws.accent_color?.toLowerCase() === sw.hex ? 'active' : ''}" style="background:${sw.hex};" data-swatch="${sw.hex}" title="${sw.label}" aria-label="${sw.label}"></button>`
-                  )
-                  .join('')}
               </div>
-              <input class="input mono" id="ws-accent" name="accent_color" value="${escapeHtml(ws.accent_color || '#095c4f')}" style="width:110px;" pattern="^#[0-9a-fA-F]{6}$" />
-            </div>
-          </div>
 
-          <div class="field-group">
-            <label class="field-label" for="ws-bg">Page background colour</label>
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <input type="color" class="color-picker-native" id="ws-bg-picker" value="${escapeHtml(ws.bg_color || '#f7f5f2')}" aria-label="Pick background colour" />
-              <div class="swatch-row">
-                ${bgSwatches
-                  .map(
-                    (sw) => `<button type="button" class="swatch-btn swatch-btn-light ${ws.bg_color?.toLowerCase() === sw.hex ? 'active' : ''}" style="background:${sw.hex};" data-bg-swatch="${sw.hex}" title="${sw.label}" aria-label="${sw.label}"></button>`
-                  )
-                  .join('')}
+              <div class="form-grid-2">
+                <div class="field-group" style="margin-bottom:0;">
+                  <label class="field-label" for="ws-font">Typography</label>
+                  <select class="select" id="ws-font" name="font_preset">
+                    <option value="minimal" ${ws.font_preset === 'minimal' ? 'selected' : ''}>Minimal (Inter)</option>
+                    <option value="editorial" ${ws.font_preset === 'editorial' ? 'selected' : ''}>Editorial (Merriweather + Inter)</option>
+                    <option value="modern" ${ws.font_preset === 'modern' ? 'selected' : ''}>Modern (Inter Clean)</option>
+                    <option value="classic" ${ws.font_preset === 'classic' ? 'selected' : ''}>Classic (Merriweather Serif)</option>
+                  </select>
+                </div>
+                <div class="field-group" style="margin-bottom:0;">
+                  <label class="field-label" for="ws-radius">Corners &amp; buttons</label>
+                  <select class="select" id="ws-radius" name="radius_preset">
+                    <option value="balanced" ${ws.radius_preset === 'balanced' ? 'selected' : ''}>Balanced (Pill buttons)</option>
+                    <option value="soft" ${ws.radius_preset === 'soft' ? 'selected' : ''}>Soft Studio (Rounded)</option>
+                    <option value="sharp" ${ws.radius_preset === 'sharp' ? 'selected' : ''}>Architectural (Crisp)</option>
+                  </select>
+                </div>
               </div>
-              <input class="input mono" id="ws-bg" name="bg_color" value="${escapeHtml(ws.bg_color || '#f7f5f2')}" style="width:110px;" pattern="^#[0-9a-fA-F]{6}$" />
-            </div>
-          </div>
+            </section>
 
-          <div class="form-grid-2">
-            <div class="field-group" style="margin-bottom:0;">
-              <label class="field-label" for="ws-font">Typography pairing</label>
-              <select class="select" id="ws-font" name="font_preset">
-                <option value="minimal" ${ws.font_preset === 'minimal' ? 'selected' : ''}>Minimal (Inter)</option>
-                <option value="editorial" ${ws.font_preset === 'editorial' ? 'selected' : ''}>Editorial (Merriweather + Inter)</option>
-                <option value="modern" ${ws.font_preset === 'modern' ? 'selected' : ''}>Modern (Inter Clean)</option>
-                <option value="classic" ${ws.font_preset === 'classic' ? 'selected' : ''}>Classic (Merriweather Serif)</option>
-              </select>
-            </div>
-            <div class="field-group" style="margin-bottom:0;">
-              <label class="field-label" for="ws-radius">Corners & buttons</label>
-              <select class="select" id="ws-radius" name="radius_preset">
-                <option value="balanced" ${ws.radius_preset === 'balanced' ? 'selected' : ''}>Balanced (12px · Pill buttons)</option>
-                <option value="soft" ${ws.radius_preset === 'soft' ? 'selected' : ''}>Soft Studio (26px · Pill buttons)</option>
-                <option value="sharp" ${ws.radius_preset === 'sharp' ? 'selected' : ''}>Architectural (8px · Square buttons)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div class="card card-padded" style="position:sticky;top:84px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;">
-            <h2 class="section-title" style="margin:0;">Live brand preview</h2>
-            <div class="toolbar-group">
-              ${
-                firstFormId
-                  ? `<a class="btn btn-secondary btn-sm" href="/demo/${encodeURIComponent(firstFormId)}?theme=brand" target="_blank" rel="noopener">Hosted Form ${icons.external}</a>`
-                  : ''
-              }
-              <a class="btn btn-secondary btn-sm" href="/thanks" target="_blank" rel="noopener">/thanks ${icons.external}</a>
-            </div>
-          </div>
-
-          <div class="brand-preview-stage" id="brand-preview-stage">
-            <div class="brand-preview-card">
-              <div id="preview-logo-slot" style="margin-bottom:12px;">
-                ${
-                  ws.logo_url
-                    ? `<img src="${escapeHtml(ws.logo_url)}" alt="" style="max-height:26px;max-width:140px;object-fit:contain;display:block;" />`
-                    : `<span class="cell-secondary" style="text-transform:uppercase;letter-spacing:0.05em;font-weight:600;color:var(--accent);">${escapeHtml(ws.brand_name || 'AskForms')}</span>`
-                }
+            <section class="card card-padded">
+              <div style="margin-bottom:18px;">
+                <h2 class="section-title" style="margin:0;">Confirmation &amp; Email</h2>
+                <p class="cell-secondary" style="margin:3px 0 0;font-size:13px;">Message visitors see right after submitting a form.</p>
               </div>
-              <div id="preview-title" style="font-family:var(--font-display);font-size:22px;font-weight:500;letter-spacing:-0.02em;margin-bottom:14px;">Contact us</div>
-              <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
-                <div style="height:34px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-surface);padding:0 10px;display:flex;align-items:center;font-size:12.5px;color:var(--ink-faint);">alex@client.com.au</div>
-                <div style="height:56px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-surface);padding:8px 10px;font-size:12.5px;color:var(--ink-faint);">Tell us about your project...</div>
+
+              <div class="form-grid-2">
+                <div class="field-group">
+                  <label class="field-label" for="ws-thanks-h">Thank-you heading</label>
+                  <input class="input" id="ws-thanks-h" name="thanks_heading" value="${escapeHtml(ws.thanks_heading)}" placeholder="Enquiry received" />
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="ws-email-footer">Email footer line</label>
+                  <input class="input" id="ws-email-footer" name="email_footer" value="${escapeHtml(ws.email_footer)}" placeholder="Your Business · Sydney NSW" />
+                </div>
               </div>
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-                <span class="btn btn-primary btn-sm" style="pointer-events:none;">Send inquiry</span>
-                <span class="cell-mono" style="font-size:11px;">POST /f/contact</span>
+
+              <div class="field-group" style="margin-bottom:0;">
+                <label class="field-label" for="ws-thanks-b">Thank-you message</label>
+                <input class="input" id="ws-thanks-b" name="thanks_body" value="${escapeHtml(ws.thanks_body)}" placeholder="Thanks for reaching out. Our team will get back to you shortly." />
+              </div>
+            </section>
+
+            ${
+              demo
+                ? ''
+                : `<details class="card card-padded">
+                     <summary style="cursor:pointer;font-size:14.5px;font-weight:700;color:var(--ink-primary);display:flex;align-items:center;justify-content:space-between;">
+                       <span>Email Delivery, Hosting &amp; License Key</span>
+                       <span class="tag">${ws.email_provider === 'resend' && ws.has_resend_key ? 'Resend Live' : 'Optional Setup'}</span>
+                     </summary>
+                     <div style="margin-top:18px;display:flex;flex-direction:column;gap:16px;">
+                       <div class="form-grid-2">
+                         <div class="field-group" style="margin-bottom:0;">
+                           <label class="field-label" for="ws-provider">Email provider</label>
+                           <select class="select" id="ws-provider" name="email_provider">
+                             <option value="local" ${ws.email_provider === 'local' ? 'selected' : ''}>Local Preview</option>
+                             <option value="resend" ${ws.email_provider === 'resend' ? 'selected' : ''}>Resend API (Free 3,000/mo)</option>
+                           </select>
+                         </div>
+                         <div class="field-group" style="margin-bottom:0;">
+                           <label class="field-label" for="ws-from">From email address</label>
+                           <input class="input" id="ws-from" name="mail_from" value="${escapeHtml(ws.mail_from)}" placeholder="forms@yourdomain.com.au" />
+                         </div>
+                       </div>
+
+                       <div class="field-group" style="margin-bottom:0;">
+                         <label class="field-label" for="ws-resend">Resend API key</label>
+                         <input class="input mono" id="ws-resend" name="resend_api_key" type="password" placeholder="${ws.has_resend_key ? `Saved (${ws.resend_api_key_preview}) — paste new key to replace` : 're_xxxxxxxxx'}" autocomplete="new-password" />
+                       </div>
+
+                       <div style="padding-top:14px;border-top:1px solid var(--border-subtle);">
+                         <label class="field-label" for="ws-license-key-input">Single-Domain License Key</label>
+                         <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                           <input class="input mono" id="ws-license-key-input" placeholder="${ws.has_license_key ? `Active (${escapeHtml(ws.license_key_preview)})` : 'Paste ASK1... key'}" style="flex:1;min-width:200px;" />
+                           <button type="button" class="btn btn-secondary btn-sm" data-action="activate-license">Activate Key</button>
+                         </div>
+                       </div>
+
+                       <div style="padding-top:14px;border-top:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                         <a class="btn btn-secondary btn-sm" href="/api/workspace/backup.json">${icons.download} Export Full Backup</a>
+                         <button type="button" class="btn btn-danger btn-sm" data-action="clear-demo-data">${icons.trash} Clear Workspace Data</button>
+                       </div>
+                     </div>
+                   </details>`
+            }
+
+            <div style="display:flex;justify-content:flex-end;">
+              <button type="submit" class="btn btn-primary">Save Brand Settings</button>
+            </div>
+          </div>
+
+          <div style="position:sticky;top:92px;">
+            <div style="background:#ffffff;border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:0 20px 50px -16px rgba(12,38,43,0.18);">
+              <div id="brand-preview-head" style="padding:16px 20px;background:var(--accent);color:var(--accent-text);display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                <div id="preview-logo-slot" style="min-width:0;">
+                  ${
+                    ws.logo_url
+                      ? `<img src="${escapeHtml(ws.logo_url)}" alt="" style="max-height:22px;max-width:120px;object-fit:contain;display:block;" />`
+                      : `<span style="font-size:14.5px;font-weight:700;letter-spacing:-0.015em;">${escapeHtml(ws.brand_name || 'AskForms')}</span>`
+                  }
+                </div>
+                <span style="font-size:11px;opacity:0.78;font-weight:500;">Live Preview</span>
+              </div>
+
+              <div style="padding:20px;background:var(--bg-surface);">
+                <div id="preview-title" style="font-family:var(--font-display);font-size:18px;font-weight:700;letter-spacing:-0.02em;color:var(--ink-primary);margin-bottom:14px;">Get a Quote</div>
+                <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+                  <div>
+                    <div style="font-size:11.5px;font-weight:600;color:var(--ink-secondary);margin-bottom:4px;">Your Name *</div>
+                    <div style="height:36px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-canvas);padding:0 12px;display:flex;align-items:center;font-size:12.5px;color:var(--ink-faint);">Alex Mercer</div>
+                  </div>
+                  <div>
+                    <div style="font-size:11.5px;font-weight:600;color:var(--ink-secondary);margin-bottom:4px;">Email Address *</div>
+                    <div style="height:36px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-canvas);padding:0 12px;display:flex;align-items:center;font-size:12.5px;color:var(--ink-faint);">alex@example.com.au</div>
+                  </div>
+                  <div>
+                    <div style="font-size:11.5px;font-weight:600;color:var(--ink-secondary);margin-bottom:4px;">How can we help? *</div>
+                    <div style="height:64px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-canvas);padding:9px 12px;font-size:12.5px;color:var(--ink-faint);">Tell us about your job...</div>
+                  </div>
+                </div>
+                <div style="height:40px;border-radius:var(--radius-btn);background:var(--accent);color:var(--accent-text);display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;">
+                  Send Enquiry
+                </div>
               </div>
             </div>
           </div>
-
-          <div style="margin-top:18px;">
-            <div class="field-group">
-              <label class="field-label" for="ws-thanks-h">Hosted /thanks heading</label>
-              <input class="input" id="ws-thanks-h" name="thanks_heading" value="${escapeHtml(ws.thanks_heading)}" />
-            </div>
-            <div class="field-group">
-              <label class="field-label" for="ws-thanks-b">Hosted /thanks message</label>
-              <input class="input" id="ws-thanks-b" name="thanks_body" value="${escapeHtml(ws.thanks_body)}" />
-            </div>
-            <div class="field-group" style="margin-bottom:0;">
-              <label class="field-label" for="ws-email-footer">Email footer line</label>
-              <input class="input" id="ws-email-footer" name="email_footer" value="${escapeHtml(ws.email_footer)}" placeholder="Northshore Architects · Sydney NSW" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card card-padded">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;">
-          <h2 class="section-title" style="margin:0;">Outbound email transport</h2>
-          <span class="tag ${ws.email_provider === 'resend' && ws.has_resend_key ? 'tag-success' : ''}">
-            ${ws.email_provider === 'resend' && ws.has_resend_key ? 'Live via Resend API' : 'Local Outbox Preview'}
-          </span>
-        </div>
-
-        <div class="form-grid-2">
-          <div class="field-group">
-            <label class="field-label" for="ws-provider">Provider</label>
-            <select class="select" id="ws-provider" name="email_provider">
-              <option value="local" ${ws.email_provider === 'local' ? 'selected' : ''}>Local Mail Outbox (Preview only)</option>
-              <option value="resend" ${ws.email_provider === 'resend' ? 'selected' : ''}>Resend HTTP API (Live delivery)</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label class="field-label" for="ws-from">Sender address (From)</label>
-            <input class="input" id="ws-from" name="mail_from" value="${escapeHtml(ws.mail_from)}" placeholder="forms@yourdomain.com.au" />
-          </div>
-        </div>
-
-        <div class="field-group" style="margin-bottom:0;">
-          <label class="field-label" for="ws-resend">Resend API key</label>
-          <input class="input mono" id="ws-resend" name="resend_api_key" type="password" placeholder="${ws.has_resend_key ? `Saved (${ws.resend_api_key_preview}) — enter new key to replace` : 're_xxxxxxxxx'}" autocomplete="new-password" />
-          <div class="field-hint">Resend includes 3,000 free emails/month and works over HTTPS on any host or Cloudflare Pages without SMTP ports.</div>
-        </div>
-      </div>
-
-      <div class="card card-padded">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;">
-          <h2 class="section-title" style="margin:0;">Dashboard & Owner Portal security</h2>
-          <div class="toolbar-group">
-            <span class="tag ${ws.owner_pin_enabled ? 'tag-success' : ''}">${ws.owner_pin_enabled ? 'Owner PIN Active' : 'No Owner PIN'}</span>
-            <span class="tag ${ws.auth_enabled ? 'tag-success' : 'tag-warning'}">${ws.auth_enabled ? 'Admin Locked' : 'Admin Open'}</span>
-          </div>
-        </div>
-
-        <div class="form-grid-2">
-          <div class="field-group" style="margin-bottom:0;">
-            <label class="field-label" for="ws-pass">${ws.auth_enabled ? 'Change designer admin password' : 'Designer admin password'}</label>
-            <input class="input" id="ws-pass" name="new_admin_password" type="password" minlength="6" placeholder="${ws.auth_from_env ? 'Controlled via ADMIN_PASSWORD env' : 'Minimum 6 characters'}" ${ws.auth_from_env ? 'disabled' : ''} autocomplete="new-password" />
-            <div class="field-hint">Protects the full Designer Console (<span class="mono">/</span>).</div>
-          </div>
-          <div class="field-group" style="margin-bottom:0;">
-            <label class="field-label" for="ws-owner-pin">Owner Portal 6-digit PIN (<span class="mono">/manage</span>)</label>
-            <input class="input mono" id="ws-owner-pin" name="new_owner_pin" type="password" inputmode="numeric" maxlength="6" placeholder="${ws.owner_pin_enabled ? 'PIN saved — enter 6 digits to change' : 'e.g. 246810'}" autocomplete="new-password" />
-            <div class="field-hint">Simple phone PIN for the client's <a href="/manage" target="_blank" style="text-decoration:underline;">/manage</a> Daily Ops portal.</div>
-          </div>
-        </div>
-        ${
-          (ws.auth_enabled && !ws.auth_from_env) || ws.owner_pin_enabled
-            ? `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-                ${ws.auth_enabled && !ws.auth_from_env ? '<button type="button" class="btn btn-secondary btn-sm" data-action="disable-auth">Remove admin password</button>' : ''}
-                ${ws.owner_pin_enabled ? '<button type="button" class="btn btn-secondary btn-sm" data-action="disable-owner-pin">Remove owner PIN</button>' : ''}
-              </div>`
-            : ''
-        }
-      </div>
-
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-        <button type="button" class="btn btn-danger btn-sm" data-action="clear-demo-data">
-          ${icons.trash} Clear demo data for client handoff
-        </button>
-        <button type="submit" class="btn btn-primary">Save brand & hosting settings</button>
-      </div>
         </form>
       </div>
     </div>
@@ -3093,68 +3075,38 @@ function toggleSidebarPane() {
   syncSidebarToggleState();
 }
 
-function launchLivePopoutPreview(formId, mode = 'drawer') {
+function launchLivePopoutPreview(formId, mode = 'popover') {
   const form = state.forms.find((f) => f.id === formId) || state.currentForm;
   if (!form) {
     showToast('Create or save the form first before testing.');
     return;
   }
   const title = form.name || 'Website Enquiry';
-
-  // In Demo Mode, forms live in ephemeral sessionStorage (not D1), so render an instant interactive preview modal
-  if (isDemoMode()) {
-    const fields = Array.isArray(form.fields) ? form.fields : [];
-    const fieldsHtml = fields
-      .map((fld) => {
-        if (fld.type === 'textarea') {
-          return `<div class="field-group"><label class="field-label">${escapeHtml(fld.label)}${fld.required ? ' *' : ''}</label><textarea class="textarea" placeholder="${escapeHtml(fld.placeholder || '')}"></textarea></div>`;
-        }
-        if (fld.type === 'select') {
-          const opts = (Array.isArray(fld.options) ? fld.options : String(fld.options || '').split(',')).map((o) => `<option>${escapeHtml(String(o).trim())}</option>`).join('');
-          return `<div class="field-group"><label class="field-label">${escapeHtml(fld.label)}${fld.required ? ' *' : ''}</label><select class="select">${opts}</select></div>`;
-        }
-        if (fld.type === 'checklist') {
-          const opts = (Array.isArray(fld.options) ? fld.options : String(fld.options || '').split(','))
-            .map((o) => `<label style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin:5px 0;"><input type="checkbox" /> <span>${escapeHtml(String(o).trim())}</span></label>`)
-            .join('');
-          return `<div class="field-group"><label class="field-label">${escapeHtml(fld.label)}${fld.required ? ' *' : ''}</label><div>${opts}</div></div>`;
-        }
-        if (fld.type === 'checkbox') {
-          return `<div class="field-group"><label style="display:flex;align-items:center;gap:8px;font-size:13.5px;"><input type="checkbox" /> <span>${escapeHtml(fld.label)}</span></label></div>`;
-        }
-        return `<div class="field-group"><label class="field-label">${escapeHtml(fld.label)}${fld.required ? ' *' : ''}</label><input class="input" type="${escapeHtml(fld.type || 'text')}" placeholder="${escapeHtml(fld.placeholder || '')}" /></div>`;
-      })
-      .join('');
-    els.modal.classList.remove('hidden');
-    els.modalBackdrop.classList.remove('hidden');
-    els.modal.innerHTML = `
-      <div class="drawer-header">
-        <strong>${escapeHtml(title)} (Live Preview)</strong>
-        <button class="btn btn-ghost btn-sm" data-action="close-modal" aria-label="Close">${icons.close}</button>
-      </div>
-      <form class="modal-body" onsubmit="event.preventDefault();this.innerHTML='<div style=\\'padding:28px 12px;text-align:center;\\'><strong style=\\'font-size:16px;\\'>Enquiry received!</strong><p style=\\'color:var(--ink-secondary);margin:8px 0 0;font-size:13.5px;\\'>In production, this submission is saved and triggers your enabled notifications &amp; routing rules.</p></div>';">
-        ${fieldsHtml}
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">${escapeHtml(form.submit_label || 'Send Enquiry')}</button>
-      </form>
-    `;
-    return;
-  }
+  const accent = state.workspace?.accent_color || '#14383e';
+  const useSrcdoc = isDemoMode();
+  const openOpts = {
+    formId: form.id,
+    mode: mode || 'popover',
+    title,
+    accent,
+    srcdoc: useSrcdoc ? buildLiveFormPreviewDoc(form, form.id === state.selectedFormId ? state.builderFields : form.fields) : '',
+  };
 
   if (window.AskForms) {
-    window.AskForms.open({ formId: form.id, mode, title });
+    window.AskForms.open(openOpts);
     return;
   }
   const script = document.createElement('script');
   script.src = `/widget.js?v=${Date.now()}`;
   script.setAttribute('data-form', form.id);
-  script.setAttribute('data-mode', mode);
+  script.setAttribute('data-mode', openOpts.mode);
   script.setAttribute('data-launcher', 'false');
   script.setAttribute('data-label', form.submit_label || 'Get a Quote');
   script.setAttribute('data-title', title);
-  script.setAttribute('data-accent', state.workspace?.accent_color || '#14383e');
+  script.setAttribute('data-accent', accent);
   script.onload = () => {
     if (window.AskForms) {
-      window.AskForms.open({ formId: form.id, mode, title });
+      window.AskForms.open(openOpts);
     }
   };
   document.body.appendChild(script);
@@ -4242,7 +4194,7 @@ document.addEventListener('click', async (e) => {
   if (testPopoutBtn) {
     e.stopPropagation();
     const formId = testPopoutBtn.dataset.testPopout;
-    const mode = testPopoutBtn.dataset.testMode || state.popoutMode || 'drawer';
+    const mode = testPopoutBtn.dataset.testMode || 'popover';
     launchLivePopoutPreview(formId, mode);
     return;
   }

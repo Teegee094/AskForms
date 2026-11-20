@@ -127,7 +127,18 @@
       var titleEl = panel.querySelector('#af-panel-title');
       if (titleEl) titleEl.textContent = opts.title;
     }
-    ensureFrameLoaded(activeFormId);
+    if (opts.accent) {
+      var headEl = panel.querySelector('.af-head');
+      if (headEl) headEl.style.background = opts.accent;
+    }
+    if (opts.srcdoc) {
+      loadedSrc = '';
+      iframe.removeAttribute('src');
+      iframe.srcdoc = opts.srcdoc;
+    } else {
+      iframe.removeAttribute('srcdoc');
+      ensureFrameLoaded(activeFormId);
+    }
     isOpen = true;
     panel.classList.add('af-open');
     if (activeMode === 'drawer') {
